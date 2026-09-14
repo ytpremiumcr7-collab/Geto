@@ -339,7 +339,12 @@ export function MapView({
     (async () => {
       try {
         const info = await fetchFirmsWms();
-        if (!cancelled && info.available && info.tile_url) setFirmsUrl(info.tile_url);
+        if (!cancelled && info.available && info.tile_url) {
+          const u = info.tile_url.startsWith("http")
+            ? info.tile_url
+            : `${window.location.origin}${info.tile_url}`;
+          setFirmsUrl(u);
+        }
         else if (!cancelled) setFirmsOn(false);
       } catch {
         if (!cancelled) setFirmsOn(false);

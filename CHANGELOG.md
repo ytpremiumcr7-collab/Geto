@@ -2,6 +2,13 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.7.1] — 2026-09-14
+
+### Fixed / hardened
+- `/health/ready` always returns `errors[]` + timings; dependency failures logged (no silent pass)
+- WebSocket: structured logs on connect, auth failure, disconnect (code/reason), cleanup
+- FIRMS: MAP_KEY never sent to client; HMAC tile ticket + server-side WMS proxy
+
 ## [2.7.0] — 2026-09-14
 
 ### Added

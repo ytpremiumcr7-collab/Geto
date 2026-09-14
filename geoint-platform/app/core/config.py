@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     usgs_interval_seconds: int = 60
 
     firms_map_key: str | None = None
+    firms_tile_hmac_secret: str | None = None  # optional; defaults to jwt_secret
     firms_source: str = "VIIRS_NOAA20_NRT"
     firms_bbox: str = "-180,-90,180,90"
     firms_day_range: int = 1
