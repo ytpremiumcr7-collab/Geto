@@ -63,7 +63,6 @@ class TopographyEngine:
         "geographic CRS uses crude m→degree conversion; DEM surface only."
     )
 
-
     def sample_elevation(self, raster_path: str, lon: float, lat: float) -> float | None:
         rasterio, rowcol, xy, rio_transform = _require_rasterio()
         with rasterio.open(raster_path) as ds:

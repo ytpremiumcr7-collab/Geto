@@ -46,7 +46,9 @@ class WorkspaceService:
         )
         return [_ws_dict(w) for w in result.scalars().all()]
 
-    async def get(self, session: AsyncSession, tenant_id: str, workspace_id: uuid.UUID) -> Workspace | None:
+    async def get(
+        self, session: AsyncSession, tenant_id: str, workspace_id: uuid.UUID
+    ) -> Workspace | None:
         w = await session.get(Workspace, workspace_id)
         if w is None or w.tenant_id != tenant_id:
             return None
@@ -161,7 +163,10 @@ class WorkspaceService:
 
     async def _clear_default(self, session: AsyncSession, tenant_id: str) -> None:
         result = await session.execute(
-            select(Workspace).where(Workspace.tenant_id == tenant_id, Workspace.is_default.is_(True))
+            select(Workspace).where(
+                Workspace.tenant_id == tenant_id,
+                Workspace.is_default.is_(True),
+            )
         )
         for w in result.scalars().all():
             w.is_default = False

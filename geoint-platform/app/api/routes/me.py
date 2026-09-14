@@ -17,12 +17,6 @@ async def me(principal: Principal = Depends(get_current_principal)):
     # Sources the principal can read (product-facing)
     readable = []
     for source_id, policy in SOURCE_POLICIES.items():
-        can_read = False
-        if policy.read_permission and policy.read_permission in principal.permissions():
-            can_read = True
-        elif principal.has_any_role("admin", "operator", "goodmode"):
-            # fallback via assert path — filter helper
-            pass
         readable.append(
             {
                 "source_id": source_id,

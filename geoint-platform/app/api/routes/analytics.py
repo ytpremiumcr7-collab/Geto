@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.analytics.clickhouse import QUERY_TEMPLATES, ClickHouseClient
 from app.auth.dependencies import get_current_principal, require_roles

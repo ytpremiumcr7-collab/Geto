@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.alerts.models import AlertChannel, AlertDelivery, GeofenceAlert
@@ -79,9 +79,7 @@ class DeliveryService:
         )
         return [_delivery_dict(d) for d in result.scalars().all()]
 
-    async def claim_batch(
-        self, session: AsyncSession, *, limit: int = 20
-    ) -> list[AlertDelivery]:
+    async def claim_batch(self, session: AsyncSession, *, limit: int = 20) -> list[AlertDelivery]:
         """Claim pending/failed deliveries ready for retry (system tenant)."""
         now = datetime.now(UTC)
         result = await session.execute(

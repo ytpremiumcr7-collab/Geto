@@ -83,7 +83,8 @@ class ClickHouseClient:
             }
         sql = QUERY_TEMPLATES.get(template_id)
         if not sql:
-            raise ValueError(f"Unknown template_id: {template_id}. Allowed: {sorted(QUERY_TEMPLATES)}")
+            allowed = sorted(QUERY_TEMPLATES)
+            raise ValueError(f"Unknown template_id: {template_id}. Allowed: {allowed}")
 
         # Parameterized via ClickHouse HTTP query params
         q_params = {
@@ -103,7 +104,11 @@ class ClickHouseClient:
                     headers={"Content-Type": "text/plain"},
                 )
                 if r.status_code >= 400:
-                    log.warning("clickhouse_query_failed status=%s body=%s", r.status_code, r.text[:500])
+                    log.warning(
+                        "clickhouse_query_failed status=%s body=%s",
+                        r.status_code,
+                        r.text[:500],
+                    )
                     return {
                         "enabled": True,
                         "template_id": template_id,

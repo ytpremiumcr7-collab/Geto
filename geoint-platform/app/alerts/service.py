@@ -57,7 +57,9 @@ def _alert_dict(a: GeofenceAlert) -> dict[str, Any]:
 class AlertService:
     async def list_channels(self, session: AsyncSession, tenant_id: str) -> list[dict[str, Any]]:
         result = await session.execute(
-            select(AlertChannel).where(AlertChannel.tenant_id == tenant_id).order_by(AlertChannel.name)
+            select(AlertChannel)
+            .where(AlertChannel.tenant_id == tenant_id)
+            .order_by(AlertChannel.name)
         )
         return [_channel_dict(c) for c in result.scalars().all()]
 

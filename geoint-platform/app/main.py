@@ -8,20 +8,20 @@ from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.api.routes.admin_jobs import router as admin_jobs_router
+from app.api.routes.alerts import router as alerts_router
+from app.api.routes.analytics import router as analytics_router
 from app.api.routes.dlq import router as dlq_router
 from app.api.routes.entities import router as entities_router
 from app.api.routes.events import router as events_router
 from app.api.routes.geofences import router as geofences_router
 from app.api.routes.health import router as health_router
+from app.api.routes.me import router as me_router
 from app.api.routes.observations import router as observations_router
 from app.api.routes.sources import router as sources_router
 from app.api.routes.topography import router as topography_router
-from app.api.routes.workspaces import router as workspaces_router
-from app.api.routes.alerts import router as alerts_router
-from app.api.routes.admin_jobs import router as admin_jobs_router
-from app.api.routes.analytics import router as analytics_router
-from app.api.routes.me import router as me_router
 from app.api.routes.websocket import router as websocket_router
+from app.api.routes.workspaces import router as workspaces_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.logging import configure_logging

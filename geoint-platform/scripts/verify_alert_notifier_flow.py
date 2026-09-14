@@ -309,7 +309,13 @@ async def main() -> int:
                 continue
             if et == "exit" and not rule.on_exit:
                 continue
-            out.append({"event_type": et, "entity_id": event["entity_id"], "channels": rule.channel_ids})
+            out.append(
+                {
+                    "event_type": et,
+                    "entity_id": event["entity_id"],
+                    "channels": rule.channel_ids,
+                }
+            )
         return out
 
     ev = {
@@ -372,4 +378,4 @@ if __name__ == "__main__":
         raise SystemExit(asyncio.run(main()))
     except Exception:
         traceback.print_exc()
-        raise SystemExit(1)
+        raise SystemExit(1) from None

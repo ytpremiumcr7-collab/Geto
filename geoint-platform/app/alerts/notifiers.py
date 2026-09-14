@@ -24,7 +24,9 @@ class NotifierResult:
 
 
 class Notifier(Protocol):
-    async def send(self, *, alert: dict[str, Any], channel_config: dict[str, Any]) -> NotifierResult: ...
+    async def send(
+        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+    ) -> NotifierResult: ...
 
 
 def build_alert_body(alert: dict[str, Any]) -> dict[str, Any]:
@@ -44,7 +46,9 @@ def build_alert_body(alert: dict[str, Any]) -> dict[str, Any]:
 
 
 class LogNotifier:
-    async def send(self, *, alert: dict[str, Any], channel_config: dict[str, Any]) -> NotifierResult:
+    async def send(
+        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+    ) -> NotifierResult:
         body = build_alert_body(alert)
         log.info(
             "alert_notify_log entity=%s event=%s severity=%s alert_id=%s",
@@ -62,7 +66,9 @@ class WebhookNotifier:
     def __init__(self, timeout: float = 15.0):
         self.timeout = timeout
 
-    async def send(self, *, alert: dict[str, Any], channel_config: dict[str, Any]) -> NotifierResult:
+    async def send(
+        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+    ) -> NotifierResult:
         url = (channel_config.get("url") or "").strip()
         if not url:
             return NotifierResult(ok=False, error="webhook config missing url")
@@ -99,7 +105,9 @@ class WebhookNotifier:
 class SmtpNotifier:
     """Send email via SMTP. Channel config: {to, cc?, subject?}. Server from settings."""
 
-    async def send(self, *, alert: dict[str, Any], channel_config: dict[str, Any]) -> NotifierResult:
+    async def send(
+        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+    ) -> NotifierResult:
         from app.core.config import settings
 
         to_addr = (channel_config.get("to") or "").strip()
@@ -176,7 +184,9 @@ class SmtpNotifier:
 class WebsocketNotifier:
     """Publish alert to NATS for realtime UI fan-out (subject geoint.alert.<tenant>)."""
 
-    async def send(self, *, alert: dict[str, Any], channel_config: dict[str, Any]) -> NotifierResult:
+    async def send(
+        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+    ) -> NotifierResult:
         try:
             from app.messaging.jetstream import JetStreamClient
 
