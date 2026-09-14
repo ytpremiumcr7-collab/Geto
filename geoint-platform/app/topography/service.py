@@ -307,6 +307,8 @@ class TopographyService:
         observer_height_m: float = 1.7,
         target_height_m: float = 0.0,
         dem_id: str | None = None,
+        sample_distance_m: float | None = None,
+        refraction_k: float | None = 1.333,
     ) -> LosResponse:
         asset = await self._pick_asset(tenant_id, observer_lon, observer_lat, dem_id)
         if not asset:
@@ -325,7 +327,35 @@ class TopographyService:
                 source="none",
                 provider="none",
                 note="No DEM available for LOS; register a local COG first",
+                quality={
+                    "decision_grade": "exploratory",
+                    "horizontal_uncertainty_m": 30.0,
+                    "vertical_uncertainty_m": 15.0,
+                    "dem_resolution_m": None,
+                    "vertical_datum": "unknown",
+                    "crs": "EPSG:4326",
+                    "refraction_model": "none",
+                    "curvature_applied": False,
+                    "confidence_0_1": 0.0,
+                    "limiting_factors": ["No DEM registered"],
+                    "certification": (
+                        "NOT certified for safety-of-life, IFR procedure design, "
+                        "or weapons employment. Suitable as decision-support when "
+                        "uncertainty is carried forward by the operator."
+                    ),
+                    "sample_distance_m": sample_distance_m,
+                    "sample_clamped_to_gsd": False,
+                },
             )
+        gsd = float(asset.get("resolution_m") or 30.0)
+        requested = sample_distance_m if sample_distance_m is not None else gsd
+        # Policy: sample step must not exceed DEM GSD
+        clamped = False
+        step = requested
+        if step > gsd:
+            step = gsd
+            clamped = True
+        datum = asset.get("vertical_datum") or "unknown"
         path = await self._resolve_raster(asset["file_uri"])
         try:
             result = self.engine.line_of_sight(
@@ -334,12 +364,44 @@ class TopographyService:
                 observer_lat,
                 target_lon,
                 target_lat,
-                observer_height_m,
-                target_height_m,
+                observer_height_m=observer_height_m,
+                target_height_m=target_height_m,
+                sample_distance_m=step,
+                refraction_k=refraction_k,
+                dem_resolution_m=gsd,
+                vertical_datum=str(datum),
             )
-            profile = [ProfilePoint(**p) for p in result.get("profile", [])]
+            quality = result.get("quality") or {}
+            if isinstance(quality, dict):
+                quality = {
+                    **quality,
+                    "sample_distance_m": step,
+                    "sample_clamped_to_gsd": clamped,
+                    "vertical_datum": str(datum),
+                    "dem_resolution_m": gsd,
+                }
+                if clamped:
+                    factors = list(quality.get("limiting_factors") or [])
+                    factors.append(
+                        f"sample_distance_m clamped to DEM GSD ({gsd} m)"
+                    )
+                    quality["limiting_factors"] = factors
+            profile = [
+                ProfilePoint(
+                    distance_m=pt.get("distance_m", 0.0),
+                    lon=pt.get("lon", 0.0),
+                    lat=pt.get("lat", 0.0),
+                    elevation_m=pt.get("elevation_m"),
+                    slope_deg=pt.get("slope_deg"),
+                )
+                for pt in (result.get("profile") or [])
+            ]
+            note = result.get("note")
+            if clamped:
+                extra = f"sample_distance_m clamped to GSD {gsd} m"
+                note = f"{note}; {extra}" if note else extra
             return LosResponse(
-                visible=result["visible"],
+                visible=bool(result.get("visible")),
                 observer={
                     "lon": observer_lon,
                     "lat": observer_lat,
@@ -357,7 +419,12 @@ class TopographyService:
                 source=asset["provider"],
                 provider=asset["provider"],
                 dem_id=asset.get("id"),
-                note=result.get("note"),
+                note=note,
+                resolution_m=gsd,
+                vertical_datum=str(datum),
+                sample_distance_m=step,
+                algorithm=result.get("algorithm"),
+                quality=quality,
             )
         finally:
             self._cleanup_temp(path, asset["file_uri"])

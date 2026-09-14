@@ -292,8 +292,34 @@ export function TopographyPanel({
               )}
             <div className="muted small">
               {losResult.provider}
+              {losResult.resolution_m != null
+                ? ` · GSD ${losResult.resolution_m} m`
+                : ""}
+              {losResult.vertical_datum
+                ? ` · ${losResult.vertical_datum}`
+                : ""}
+              {losResult.sample_distance_m != null
+                ? ` · sample ${losResult.sample_distance_m} m`
+                : ""}
               {losResult.note ? ` · ${losResult.note}` : ""}
             </div>
+            {losResult.quality && (
+              <div className="topo-quality" role="note">
+                <div className="muted small">
+                  Grado: <strong>{losResult.quality.decision_grade}</strong>
+                  {" · "}±{losResult.quality.horizontal_uncertainty_m} m H
+                  {" / "}±{losResult.quality.vertical_uncertainty_m} m V
+                  {" · conf "}
+                  {(losResult.quality.confidence_0_1 * 100).toFixed(0)}%
+                  {losResult.quality.sample_clamped_to_gsd
+                    ? " · sample≤GSD"
+                    : ""}
+                </div>
+                <div className="topo-disclaimer">
+                  {losResult.quality.certification}
+                </div>
+              </div>
+            )}
           </div>
         )}
 

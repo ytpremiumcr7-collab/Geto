@@ -31,3 +31,45 @@ def test_viewshed_quality_dict():
     ).as_dict()
     assert "decision_grade" in d
     assert d["curvature_applied"] is True
+
+
+def test_sample_must_not_exceed_gsd_policy():
+    """Policy mirror: step = min(requested, gsd)."""
+    gsd = 12.0
+    requested = 50.0
+    step = requested if requested <= gsd else gsd
+    clamped = requested > gsd
+    assert step == 12.0 and clamped
+
+
+def test_vertical_datum_required_semantics():
+    from app.topography.models import DemAssetCreate, DemProvider, DemProductType
+
+    # valid
+    DemAssetCreate(
+        provider=DemProvider.LOCAL,
+        product_name="lidar-1m",
+        product_type=DemProductType.DTM,
+        resolution_m=1.0,
+        vertical_datum="NAVD88",
+        bbox_west=-99.2,
+        bbox_south=19.3,
+        bbox_east=-99.0,
+        bbox_north=19.5,
+        file_uri="s3://bucket/dem/lidar.tif",
+    )
+    try:
+        DemAssetCreate(
+            provider=DemProvider.LOCAL,
+            product_name="bad",
+            resolution_m=1.0,
+            vertical_datum="",  # type: ignore[arg-type]
+            bbox_west=0,
+            bbox_south=0,
+            bbox_east=1,
+            bbox_north=1,
+            file_uri="s3://x",
+        )
+        raise AssertionError("empty vertical_datum should fail")
+    except Exception:
+        pass

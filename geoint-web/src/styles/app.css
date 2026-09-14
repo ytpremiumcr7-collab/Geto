@@ -884,3 +884,18 @@ button.ghost {
   flex: 1;
   min-height: 0;
 }
+
+.topo-quality {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: rgba(240, 180, 41, 0.06);
+}
+.topo-disclaimer {
+  margin-top: 0.35rem;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--warn);
+  font-weight: 500;
+}

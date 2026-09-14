@@ -2,6 +2,13 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.6.1] — 2026-09-14
+
+### Added
+- DEM register requires documented `vertical_datum`; `resolution_m` is GSD
+- LOS clamps `sample_distance_m` to DEM GSD; quality flags `sample_clamped_to_gsd`
+- UI always renders `quality.certification` (disclaimer never stripped)
+
 ## [2.6.0] — 2026-09-14
 
 ### Added

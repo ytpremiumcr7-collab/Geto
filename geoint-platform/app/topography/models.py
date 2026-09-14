@@ -28,9 +28,14 @@ class DemAssetCreate(BaseModel):
     provider: DemProvider
     product_name: str
     product_type: DemProductType = DemProductType.DTM
-    resolution_m: float
+    resolution_m: float = Field(..., gt=0, le=1000, description="Ground sample distance (m)")
     crs: str = "EPSG:4326"
-    vertical_datum: str | None = "EGM96"
+    vertical_datum: str = Field(
+        ...,
+        min_length=2,
+        max_length=64,
+        description="Required vertical datum, e.g. EGM96, NAVD88, ELLIPSOIDAL_WGS84",
+    )
     bbox_west: float
     bbox_south: float
     bbox_east: float
@@ -123,7 +128,33 @@ class LosRequest(BaseModel):
     observer_height_m: float = 1.7
     target_height_m: float = 0.0
     dem_id: str | None = None
-    curvature_coeff: float = Field(0.85714, description="1 - 1/7 refraction approx")
+    sample_distance_m: float | None = Field(
+        None,
+        ge=0.5,
+        le=5000.0,
+        description="Profile step; if omitted or > DEM GSD, clamped to resolution_m",
+    )
+    refraction_k: float | None = Field(
+        1.333,
+        description="Effective-Earth factor; None disables curvature (exploratory)",
+    )
+    curvature_coeff: float = Field(0.85714, description="Viewshed GDAL coeff (legacy field)")
+
+
+class TerrainQualityOut(BaseModel):
+    decision_grade: str
+    horizontal_uncertainty_m: float
+    vertical_uncertainty_m: float
+    dem_resolution_m: float | None = None
+    vertical_datum: str
+    crs: str = "EPSG:4326"
+    refraction_model: str
+    curvature_applied: bool
+    confidence_0_1: float
+    limiting_factors: list[str] = Field(default_factory=list)
+    certification: str
+    sample_distance_m: float | None = None
+    sample_clamped_to_gsd: bool = False
 
 
 class LosResponse(BaseModel):
@@ -138,6 +169,11 @@ class LosResponse(BaseModel):
     provider: str
     dem_id: str | None = None
     note: str | None = None
+    resolution_m: float | None = None
+    vertical_datum: str | None = None
+    sample_distance_m: float | None = None
+    algorithm: str | None = None
+    quality: TerrainQualityOut | dict[str, Any] | None = None
 
 
 class ViewshedRequest(BaseModel):
@@ -157,3 +193,6 @@ class ViewshedResponse(BaseModel):
     source: str
     provider: str
     note: str | None = None
+    resolution_m: float | None = None
+    vertical_datum: str | None = None
+    quality: TerrainQualityOut | dict[str, Any] | None = None

@@ -37,3 +37,10 @@ It does **not** produce ICAO/FAA procedure design, IFR, or weapons-employment ce
 ## API
 
 LOS/viewshed JSON includes `quality: { decision_grade, horizontal_uncertainty_m, vertical_uncertainty_m, confidence_0_1, ... }`.
+
+## GSD and vertical datum (enforced)
+
+- Registering a DEM **requires** non-empty `vertical_datum` and positive `resolution_m` (GSD).
+- LOS `sample_distance_m` is **clamped to ≤ GSD**; responses include `sample_clamped_to_gsd`.
+- Clients **must** display `quality.certification` (TopographyPanel does; do not remove).
+

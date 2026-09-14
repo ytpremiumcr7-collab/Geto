@@ -200,6 +200,23 @@ export type ProfileResult = {
   sample_distance_m: number;
 };
 
+export type TerrainQuality = {
+  decision_grade: string;
+  horizontal_uncertainty_m: number;
+  vertical_uncertainty_m: number;
+  dem_resolution_m?: number | null;
+  vertical_datum: string;
+  crs?: string;
+  refraction_model: string;
+  curvature_applied: boolean;
+  confidence_0_1: number;
+  limiting_factors?: string[];
+  /** Binding disclaimer — never strip in UI */
+  certification: string;
+  sample_distance_m?: number | null;
+  sample_clamped_to_gsd?: boolean;
+};
+
 export type LosResult = {
   visible: boolean;
   observer: { lon: number; lat: number; height_m?: number };
@@ -212,6 +229,11 @@ export type LosResult = {
   provider: string;
   dem_id?: string | null;
   note?: string | null;
+  resolution_m?: number | null;
+  vertical_datum?: string | null;
+  sample_distance_m?: number | null;
+  algorithm?: string | null;
+  quality?: TerrainQuality | null;
 };
 
 export type DemAsset = {
@@ -219,6 +241,8 @@ export type DemAsset = {
   provider: string;
   product_name: string;
   resolution_m: number;
+  vertical_datum?: string | null;
+  crs?: string;
   file_uri: string;
   bbox_west: number;
   bbox_south: number;
@@ -255,6 +279,8 @@ export async function fetchLos(body: {
   observer_height_m?: number;
   target_height_m?: number;
   dem_id?: string;
+  sample_distance_m?: number;
+  refraction_k?: number | null;
 }) {
   return api<LosResult>("/api/v1/topography/los", {
     method: "POST",

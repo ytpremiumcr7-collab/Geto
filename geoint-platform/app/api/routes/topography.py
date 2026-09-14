@@ -135,10 +135,8 @@ async def hillshade(
 async def line_of_sight(
     body: LosRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
-):
-    await set_tenant(session, principal.tenant_id)
-    svc = TopographyService(session)
+    svc: TopographyService = Depends(get_topography_service),
+) -> LosResponse:
     return await svc.line_of_sight(
         principal.tenant_id,
         body.observer_lon,
@@ -148,6 +146,8 @@ async def line_of_sight(
         body.observer_height_m,
         body.target_height_m,
         body.dem_id,
+        sample_distance_m=body.sample_distance_m,
+        refraction_k=body.refraction_k,
     )
 
 
