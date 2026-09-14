@@ -90,6 +90,8 @@ class SourceDispatcher:
         job_type: str,
         config: dict[str, Any],
         tenant_id: str = "default",
+        job_id: str | None = None,
+        message_id: str | None = None,
     ) -> int:
         adapter = self.adapters.get(source_id)
         if adapter is None:
@@ -115,7 +117,12 @@ class SourceDispatcher:
             breaker.record_failure()
             raise
 
-        raw_key = self.object_store.make_key(source_id)
+        raw_key = self.object_store.make_key(
+            source_id,
+            tenant_id=tenant_id,
+            job_id=job_id,
+            message_id=message_id,
+        )
         raw_uri = await self.object_store.put_json(raw_key, raw)
 
         received_at = datetime.now(UTC)

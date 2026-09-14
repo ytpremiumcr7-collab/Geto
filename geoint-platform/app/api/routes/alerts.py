@@ -54,6 +54,18 @@ async def create_channel(
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
     await set_tenant(db, principal.tenant_id)
+    if body.channel_type == "webhook":
+        from app.alerts.ssrf import UnsafeWebhookURL, validate_webhook_url
+
+        try:
+            cfg = dict(body.config or {})
+            cfg["url"] = validate_webhook_url(
+                str(cfg.get("url") or ""),
+                require_https=bool(cfg.get("require_https")),
+            )
+            body = body.model_copy(update={"config": cfg})
+        except UnsafeWebhookURL as e:
+            raise HTTPException(status_code=400, detail=str(e)) from e
     return await svc.create_channel(
         db,
         tenant_id=principal.tenant_id,
@@ -80,6 +92,20 @@ async def create_rule(
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
     await set_tenant(db, principal.tenant_id)
+    # Geofence must belong to the same tenant (integrity, not only RLS)
+    from sqlalchemy import select
+    from app.geofencing.models import Geofence
+
+    fence = (
+        await db.execute(
+            select(Geofence).where(
+                Geofence.id == body.geofence_id,
+                Geofence.tenant_id == principal.tenant_id,
+            )
+        )
+    ).scalar_one_or_none()
+    if fence is None:
+        raise HTTPException(status_code=404, detail="Geofence not found for tenant")
     return await svc.create_rule(
         db,
         tenant_id=principal.tenant_id,

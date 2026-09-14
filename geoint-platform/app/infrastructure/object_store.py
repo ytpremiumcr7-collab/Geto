@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime
+from uuid import uuid4
 from io import BytesIO
 
 from minio import Minio
@@ -83,7 +84,22 @@ class ObjectStore:
     async def get_bytes(self, key: str, bucket: str | None = None) -> bytes:
         return await asyncio.to_thread(self._get_bytes_sync, key, bucket)
 
-    def make_key(self, source_id: str, entity_id: str | None = None) -> str:
+    def make_key(
+        self,
+        source_id: str,
+        entity_id: str | None = None,
+        *,
+        tenant_id: str = "default",
+        job_id: str | None = None,
+        message_id: str | None = None,
+    ) -> str:
+        """Tenant-scoped unique object key (no cross-tenant / same-second collisions)."""
         now = datetime.now(UTC)
+        uid = uuid4().hex
+        job_part = (job_id or "noj")[:36]
+        msg_part = (message_id or uid)[:64]
         suffix = entity_id or "batch"
-        return f"{source_id}/{now:%Y/%m/%d}/{now:%H%M%S}_{suffix}.json"
+        return (
+            f"raw/{tenant_id}/{source_id}/{now:%Y/%m/%d}/"
+            f"{job_part}_{msg_part}_{suffix}_{uid}.json"
+        )

@@ -2,6 +2,19 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.8.0] — 2026-09-14
+
+### Fixed (audit P1 harden)
+- Worker idempotency: atomic claim (`processing` + lease) before side effects; completed/failed states
+- MinIO `make_key`: `raw/{tenant}/{source}/…` + job/message/uuid (no cross-tenant collision)
+- RLS on `source_runs`; `source_jobs` unique `(tenant_id, source_id, name)`
+- Alert `entity_type_filter` enforced; geofence events carry `entity_type`
+- Alert emit failures logged + outbox retry (no silent `pass`)
+- Webhook SSRF validation (DNS + private IP block); NATS alert subject tenant-locked
+- Rule create verifies geofence belongs to tenant
+- JWT: no silent tenant default in staging/prod; OIDC algorithms strict
+- CI: mypy/bandit/typecheck no longer `|| true`; staging CORS_ALLOW_HTTP documented
+
 ## [2.7.2] — 2026-09-14
 
 ### Changed

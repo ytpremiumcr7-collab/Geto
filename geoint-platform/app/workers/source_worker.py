@@ -115,31 +115,51 @@ class SourceWorker:
             if not message_id:
                 message_id = str(job_id)
 
-            # Idempotencia
+            # Atomic claim BEFORE side effects (processing lease)
+            worker_id = f"{self.durable}:{os.getpid()}"
             async with SessionLocal() as session:
-                if await self.idempotency.is_processed(session, message_id):
-                    log.info("already_processed", message_id=message_id)
-                    await msg.ack()
-                    return
-
-            async with SessionLocal() as session:
-                await self.dispatcher.execute(
-                    session,
-                    source_id=source_id,
-                    job_type=job_type,
-                    config=config,
-                    tenant_id=tenant_id,
-                )
-                await self.idempotency.mark_processed(
+                claim = await self.idempotency.try_claim(
                     session,
                     message_id=message_id,
                     subject=subject,
                     source_id=source_id,
+                    worker_id=worker_id,
+                    lease_seconds=max(self.ack_wait * 2, 120),
                 )
-                await self.jobs.mark_success(session, job_id)
+            if claim == "completed":
+                log.info("already_processed", message_id=message_id)
+                await msg.ack()
+                return
+            if claim == "busy":
+                log.info("claim_busy", message_id=message_id)
+                await msg.nak()
+                return
 
-            await msg.ack()
-            log.info("job_ok", job_id=str(job_id), source=source_id, delivery=delivery)
+            # We own the lease — execute side effects
+            try:
+                async with SessionLocal() as session:
+                    await self.dispatcher.execute(
+                        session,
+                        source_id=source_id,
+                        job_type=job_type,
+                        config=config,
+                        tenant_id=tenant_id,
+                        job_id=str(job_id),
+                        message_id=message_id,
+                    )
+                    await self.jobs.mark_success(session, job_id)
+                async with SessionLocal() as session:
+                    await self.idempotency.mark_completed(
+                        session, message_id=message_id, worker_id=worker_id
+                    )
+                await msg.ack()
+                log.info("job_ok", job_id=str(job_id), source=source_id, delivery=delivery)
+            except Exception:
+                async with SessionLocal() as session:
+                    await self.idempotency.mark_failed(
+                        session, message_id=message_id, worker_id=worker_id
+                    )
+                raise
 
         except Exception as exc:
             log.exception("job_failed", delivery=delivery, subject=subject)

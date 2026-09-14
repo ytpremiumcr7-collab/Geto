@@ -43,7 +43,7 @@ jobs:
         working-directory: ./geoint-platform
         run: |
           pip install -e ".[dev]"
-          mypy app/ --ignore-missing-imports --no-strict-optional || true
+          mypy app/ --ignore-missing-imports --no-strict-optional
 
   backend-test:
     name: Backend - Tests
@@ -119,13 +119,13 @@ jobs:
       - name: pip-audit
         working-directory: ./geoint-platform
         run: |
-          pip install -r requirements.lock.txt || true
-          pip-audit -r requirements.lock.txt --strict || true
+          pip install -r requirements.lock.txt
+          pip-audit -r requirements.lock.txt || true  # advisory until --require-hashes lock
         continue-on-error: true
 
       - name: Bandit SAST
         working-directory: ./geoint-platform
-        run: bandit -r app/ -ll -ii || true
+        run: bandit -r app/ -ll -ii
         continue-on-error: true
 
   # ==================== FRONTEND ====================
@@ -148,7 +148,7 @@ jobs:
 
       - name: Type check
         working-directory: ./geoint-web
-        run: npm run typecheck || true
+        run: npm run typecheck
 
       - name: Build
         working-directory: ./geoint-web
@@ -176,7 +176,7 @@ jobs:
 
       - name: npm audit
         working-directory: ./geoint-web
-        run: npm audit --audit-level=high || true
+        run: npm audit --audit-level=high || true  # advisory; does not block until lockfile policy
         continue-on-error: true
 
   # ==================== DOCKER ====================

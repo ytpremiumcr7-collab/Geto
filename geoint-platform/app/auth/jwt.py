@@ -114,9 +114,8 @@ class JWTService:
         if client is None:
             raise RuntimeError("JWT_JWKS_URL required for RS256/OIDC validation")
         signing_key = client.get_signing_key_from_jwt(token)
+        # Strict: only the configured algorithm (no silent RS256 append)
         algorithms = [self.algorithm] if self.algorithm else ["RS256"]
-        if "RS256" not in algorithms:
-            algorithms.append("RS256")
         payload = jwt.decode(
             token,
             signing_key.key,
@@ -132,7 +131,12 @@ class JWTService:
         if isinstance(roles, str):
             roles = [roles]
         tenant_claim = getattr(settings, "jwt_tenant_claim", "tenant_id")
-        tenant_id = payload.get(tenant_claim) or payload.get("tenant_id") or "default"
+        tenant_id = payload.get(tenant_claim) or payload.get("tenant_id")
+        if not tenant_id:
+            from app.core.config import settings as _s
+            if getattr(_s, "app_env", "development") in ("production", "prod", "staging"):
+                raise ValueError("JWT missing required tenant claim")
+            tenant_id = "default"
         return Principal(
             user_id=str(payload["sub"]),
             tenant_id=str(tenant_id),

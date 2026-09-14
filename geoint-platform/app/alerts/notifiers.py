@@ -72,8 +72,15 @@ class WebhookNotifier:
         url = (channel_config.get("url") or "").strip()
         if not url:
             return NotifierResult(ok=False, error="webhook config missing url")
-        if not (url.startswith("https://") or url.startswith("http://")):
-            return NotifierResult(ok=False, error="webhook url must be http(s)")
+        from app.alerts.ssrf import UnsafeWebhookURL, validate_webhook_url
+
+        try:
+            url = validate_webhook_url(
+                url,
+                require_https=bool(channel_config.get("require_https")),
+            )
+        except UnsafeWebhookURL as e:
+            return NotifierResult(ok=False, error=f"webhook blocked: {e}")
 
         body = build_alert_body(alert)
         raw = json.dumps(body, separators=(",", ":"), default=str).encode("utf-8")
@@ -192,7 +199,8 @@ class WebsocketNotifier:
 
             body = build_alert_body(alert)
             tenant = body.get("tenant_id") or "default"
-            subject = channel_config.get("subject") or f"geoint.alert.{tenant}"
+            # Subject is always tenant-scoped — never accept arbitrary subject from config
+            subject = f"geoint.alert.{tenant}"
             js = JetStreamClient()
             await js.connect()
             try:

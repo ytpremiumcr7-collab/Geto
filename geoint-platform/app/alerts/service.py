@@ -205,6 +205,15 @@ class AlertService:
                 continue
             if event_type == "exit" and not rule.on_exit:
                 continue
+            # entity_type_filter: only fire when observation type matches (if set)
+            type_filter = rule.entity_type_filter or []
+            if type_filter:
+                obs_type = (
+                    (event.get("data") or {}).get("entity_type")
+                    or event.get("entity_type")
+                )
+                if not obs_type or str(obs_type) not in {str(x) for x in type_filter}:
+                    continue
             alert = GeofenceAlert(
                 id=uuid.uuid4(),
                 tenant_id=tenant_id,
