@@ -34,3 +34,7 @@ miniodata/
 natsdata/
 geoint_deploy_key
 geoint_deploy_key.pub
+
+# archives
+*.zip
+*.tar.gz
