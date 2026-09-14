@@ -1,114 +1,39 @@
-# Topography Engine — Tezcatlipoca MVP
+# Topography
 
-## Qué es
+DEM catalog + engine (elevation, profile, slope, aspect, hillshade, LOS, viewshed).
 
-Motor topográfico real sobre la base existente (PostGIS + MinIO + GDAL + MapLibre).
+Providers supply **rasters**; Tezcatlipoca derives products. Imagery adapters (e.g. Sentinel) are separate.
 
-**No** reutiliza el adapter `copernicus` (ese es Sentinel-2 imagery).
+## API (prefix `/api/v1/topography`)
 
-## Arquitectura
-
-```
-MapLibre (AWS Terrarium)     ← visualización 3D / hillshade cliente
-         │
-FastAPI /api/v1/topography
-         │
-TopographyService
-    ├── AwsTerrariumProvider   (punto global, sin key)
-    ├── LocalRasterProvider    (COG en MinIO)
-    ├── InegiProvider          (ingest-first)
-    └── CopernicusDemProvider  (ingest-first, CDSE)
-         │
-TopographyEngine (GDAL + RasterIO + NumPy)
-    elevación | perfil | slope | aspect | hillshade | LOS | viewshed
-         │
-MinIO: dem/ + derived/
-PostgreSQL: dem_assets (catálogo + RLS)
-```
-
-## Endpoints
-
-| Método | Path | Descripción |
+| Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/topography/providers` | Info de providers + guías INEGI/Copernicus |
-| GET | `/api/v1/topography/dem` | Listar DEMs del tenant |
-| POST | `/api/v1/topography/dem/register` | Registrar COG ya subido a MinIO |
-| GET | `/api/v1/topography/elevation?lat=&lon=` | Elevación puntual (DEM local o Terrarium) |
-| POST | `/api/v1/topography/profile` | Perfil A→B densificado |
-| POST | `/api/v1/topography/slope` | Raster de pendiente → MinIO derived/ |
-| POST | `/api/v1/topography/aspect` | Orientación |
-| POST | `/api/v1/topography/hillshade` | Hillshade analítico |
-| POST | `/api/v1/topography/los` | Línea de vista A→B |
-| POST | `/api/v1/topography/viewshed` | Cuenca visual (GDAL ViewshedGenerate) |
+| GET | `/providers` | Provider metadata |
+| GET | `/dem` | List tenant DEMs |
+| POST | `/dem/register` | Register COG (`resolution_m` GSD, **required** `vertical_datum`) |
+| GET | `/elevation` | Point sample |
+| POST | `/profile` | Densified profile |
+| POST | `/los` | Line of sight |
+| POST | `/viewshed` | GDAL Wang viewshed |
+| POST | `/slope` `/aspect` `/hillshade` | Derived rasters |
 
-Todos requieren auth (JWT / API key) excepto si `AUTH_DISABLED=true`.
+## LOS
 
-## Flujo INEGI (México)
+- Profile densified at `sample_distance_m`, **clamped to ≤ DEM GSD**
+- Optional effective-Earth refraction (`refraction_k`, default 4/3)
+- Response includes `quality`: grade, H/V uncertainty, confidence, **certification disclaimer**
 
-1. Descargar MDE/CEM desde https://www.inegi.org.mx/app/geo2/elevacionesmex/
-2. `mc cp archivo.tif local/geoint-raw/dem/mexico/inegi/`
-3. `POST /api/v1/topography/dem/register` con bbox, resolución, `file_uri=s3://geoint-raw/dem/mexico/inegi/...`
-4. Usar `dem_id` en elevation/profile/los/viewshed
+## Decision-support (not safety-of-life)
 
-## Flujo Copernicus DEM
+| Grade | Meaning |
+|-------|---------|
+| `exploratory` | Rough planning; higher uncertainty |
+| `operational_support` | Inform operators who carry uncertainty forward |
 
-1. Registro CDSE + S3 credentials
-2. Descargar tiles GLO-30 del AOI
-3. Subir COG a MinIO `dem/global/copernicus/`
-4. Registrar igual que INEGI
+Products are **not** ICAO/FAA certified. Clients must display `quality.certification` (UI does).
 
-## Respuesta trazable (ejemplo)
+## Ops tips
 
-```json
-{
-  "elevation_m": 2240.5,
-  "source": "inegi",
-  "provider": "inegi",
-  "product_name": "MDE terreno 1.5m F13D79C3",
-  "resolution_m": 1.5,
-  "crs": "EPSG:4326",
-  "vertical_datum": "NAVD88 / local",
-  "dem_id": "…",
-  "sampled_at": "2026-…"
-}
-```
-
-## Migración
-
-```bash
-alembic upgrade head   # incluye 0008_dem_assets
-```
-
-## Tests
-
-```bash
-pytest tests/unit/test_topography_engine.py -v
-```
-
-## Dependencias nuevas
-
-- `rasterio>=1.4`
-- `pillow>=10` (decode Terrarium opcional; hay fallback zlib)
-
-GDAL ya estaba en el Dockerfile (`gdal-bin`, `libgdal-dev`).
-
-## Lo que NO hace este MVP
-
-- Descarga automática masiva de todo México / todo el planeta
-- Google Elevation / Mapbox Terrain / Open-Elevation público
-- PostGIS Raster (innecesario para MVP)
-- ClickHouse para topografía
-
-## Ronda 2
-
-- UI `TopographyPanel` en Dashboard (elevación / perfil / LOS)
-- MapView: click-to-pick, línea de perfil, línea LOS + punto de obstrucción
-- `scripts/ingest_inegi_cog.py` — sube COG a MinIO y registra en `dem_assets`
-- `clip_bbox` antes de slope/aspect/hillshade (rasterio window; GDAL Warp si CRS proyectado)
-- Fix: routes usan `get_db` (antes `get_session` inexistente)
-- Evidencia tests: 10 passed, 2 skipped; Terrarium live CDMX 2235 m
-
-## Precisión LOS / Viewshed
-
-Ver [TOPOGRAPHY-LOS-VIEWSHED.md](./TOPOGRAPHY-LOS-VIEWSHED.md).
-
+- Prefer high-resolution COGs with documented vertical datum  
+- Keep `sample_distance_m ≤ resolution_m`  
+- Clip DEM to AOI before large viewsheds  

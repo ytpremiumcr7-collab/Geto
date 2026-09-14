@@ -1,120 +1,40 @@
-# GEOINT Platform v2
+# geoint-platform
 
-Plataforma de inteligencia geoespacial modular para:
+Backend: FastAPI API, ingestion workers, PostGIS, alert delivery, topography engine.
 
-- aeronaves
-- satélites
-- incendios
-- terremotos
-- meteorología aeronáutica
-- datos EO/STAC
-- tracking
-- correlación
-- replay
-- observabilidad
+## Architecture (summary)
 
-## Arquitectura
+```
+Clients ──► FastAPI (REST + WebSocket)
+               ├── PostgreSQL / PostGIS  (tenant RLS)
+               ├── NATS JetStream        (jobs / events)
+               ├── MinIO                 (COGs / objects)
+               └── ClickHouse (optional) (analytics)
 
-\`\`\`
-                         ┌──────────────────────┐
-                         │       FastAPI        │
-                         │ REST / WebSocket     │
-                         └──────────┬───────────┘
-                                    │
-                    ┌───────────────┼────────────────┐
-                    │               │                │
-               PostgreSQL       ClickHouse        Redis
-                 PostGIS        Analytics          Cache
-                    │               │                │
-                    └───────────────┼────────────────┘
-                                    │
-                              NATS JetStream
-                                    │
-                           Ingestion Pipeline
-                                    │
-              ┌─────────────────────┼─────────────────────┐
-              │          │           │          │          │
-            OpenSky   CelesTrak     USGS      FIRMS   AviationWx
-              │          │           │          │          │
-              └─────────────────────┴──────────┴──────────┘
-                                    │
-                              Normalization
-                                    │
-                              Deduplication
-                                    │
-                              Quality Score
-                                    │
-                         Tracking / Correlation
-                                    │
-                                  MinIO
-                              raw payloads
-\`\`\`
+Workers: job_scheduler · source_worker · alert_notifier · outbox
+```
 
-## Fuentes implementadas
+## Run
 
-- OpenSky
-- CelesTrak
-- USGS Earthquakes
-- NASA FIRMS
-- AviationWeather.gov
-- Copernicus Data Space STAC
-
-## Requisitos
-
-- Docker
-- Docker Compose
-- Node.js 18+ para ejecutar el generador
-
-## Generar
-
-\`\`\`bash
-node generate-geoint-platform-v2.js ./geoint-platform
-cd geoint-platform
+```bash
 cp .env.example .env
-\`\`\`
-
-## Arrancar infraestructura
-
-\`\`\`bash
-docker compose up -d
-\`\`\`
-
-## Ejecutar API localmente
-
-\`\`\`python
-python -m venv .venv
-source .venv/bin/activate
-pip install -e ".[dev]"
+docker compose up -d postgres redis nats minio
 alembic upgrade head
-uvicorn app.main:app --reload
-\`\`\`
+uvicorn app.main:app --reload --port 8000
+python -m app.workers.alert_notifier
+```
+
+Production compose: `docker-compose.prod.yml`  
+Staging: `docker-compose.staging.yml` + `docs/STAGING.md`
 
 ## Tests
 
-\`\`\`bash
-pytest
-\`\`\`
+```bash
+pytest tests/unit -q
+python scripts/e2e_ci_product_flow.py   # needs PostGIS + migrations
+python scripts/staging_verify.py        # JWKS + CH + notifier
+```
 
-## Endpoints
+## Docs
 
-- GET /health/live
-- GET /health/ready
-- GET /api/v1/sources
-- GET /api/v1/observations
-- GET /api/v1/entities/{entity_id}
-- GET /api/v1/entities/{entity_id}/track
-- GET /api/v1/events
-
-## Variables obligatorias para fuentes autenticadas
-
-OpenSky:
-
-- OPENSKY_CLIENT_ID
-- OPENSKY_CLIENT_SECRET
-
-NASA FIRMS:
-
-- FIRMS_MAP_KEY
-
-Las credenciales deben configurarse mediante .env/secrets y nunca incluirse en Git.
-
+See `docs/` and the [root README](../README.md).

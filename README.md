@@ -1,92 +1,76 @@
 # GEOINT Platform (Geto)
 
-Multi-tenant geospatial intelligence: sources → observations → map → geofences → alerts → delivery.
+Multi-tenant geospatial intelligence platform: open-source feeds → observations → map → geofences → alerts → delivery.
 
-**Status:** pre-production (v2.5.0). CI must be green on `main` (lint, unit, e2e PostGIS, frontend build).
+| | |
+|--|--|
+| **Status** | Pre-production |
+| **Version** | See [`VERSION`](./VERSION) |
+| **Stack** | FastAPI · PostGIS · NATS · MinIO · React · MapLibre |
+| **CI** | Lint · unit · e2e (PostGIS) · frontend build · images |
 
-## Quick start (local pre-prod)
+## Repository layout
 
-### Prerequisites
-
-- Docker + Docker Compose
-- Node 22+, Python 3.12+
-- (Optional) GDAL for topography workers
-
-### 1. Clone and env
-
-```bash
-git clone git@github.com:ytpremiumcr7-collab/Geto.git
-cd Geto/geoint-platform
-cp .env.example .env
-# Edit .env: JWT_SECRET (≥32 chars), DATABASE_URL, no change-me values
+```
+Geto/
+├── geoint-platform/   # API, workers, migrations, ops scripts
+├── geoint-web/        # Operator UI
+├── CHANGELOG.md
+└── VERSION
 ```
 
-### 2. Infrastructure
+## Quick start (development)
+
+**Requirements:** Docker, Python 3.12+, Node 22+
 
 ```bash
+git clone git@github.com:ytpremiumcr7-collab/Geto.git && cd Geto
+
+# Backend
+cd geoint-platform
+cp .env.example .env          # set JWT_SECRET (≥32 chars); never use change-me in staging/prod
 docker compose up -d postgres redis nats minio
-# wait for healthy
 export DATABASE_URL=postgresql+asyncpg://geoint:geoint@localhost:5432/geoint
 alembic upgrade head
-```
-
-### 3. API + workers
-
-```bash
-# terminal 1
 uvicorn app.main:app --reload --port 8000
 
-# terminal 2 — alert delivery (24/7 path)
+# Alert delivery worker (separate process)
 python -m app.workers.alert_notifier
 
-# terminal 3 — optional ingestion scheduler
-python -m app.workers.job_scheduler
-```
-
-### 4. Frontend
-
-```bash
+# Frontend
 cd ../geoint-web
-npm ci
-npm run dev
-# http://localhost:5173 — login issues dev token → onboarding → map
+npm ci && npm run dev        # http://localhost:5173
 ```
-
-### 5. Verify product path
-
-```bash
-cd ../geoint-platform
-python scripts/verify_alert_notifier_flow.py   # offline
-python scripts/e2e_ci_product_flow.py          # needs API+DB (or AUTH_DISABLED ASGI)
-```
-
-Flow: **login → /me permissions → sources → map → geofence enter → alert → delivery (log/webhook/SMTP)**.
-
-## Production
-
-- `APP_ENV=production` enforces OIDC/JWKS, strong secrets, closed CORS (`docs/EDGE-AND-SECRETS.md`, `security_bootstrap`).
-- Deploy: `scripts/deploy.sh` + `docker-compose.prod.yml` (`${VAR:?required}`).
-- Feature flags: `CLICKHOUSE_ENABLED`, `AUTH_DISABLED` (never true in prod).
-
-## CI
-
-GitHub Actions: Ruff → unit tests → **E2E PostGIS smoke + product flow** → frontend Vite build → security → docker.
-
-## Docs
-
-| Doc | Topic |
-|-----|--------|
-| `geoint-platform/docs/TOPOGRAPHY-LOS-VIEWSHED.md` | LOS/viewshed precision limits |
-| `geoint-platform/docs/ALERT-NOTIFIERS.md` | Delivery channels |
-| `geoint-platform/docs/RBAC-CLIENT.md` | Permissions to UI |
-| `geoint-platform/docs/ANALYTICS-CLICKHOUSE.md` | Analytics templates |
-| `geoint-platform/docs/PRODUCTION.md` | Prod checklist |
-
-## DEM / LOS
-
-Terrain products are **decision-support**, not certified flight/safety outputs. See topography docs for algorithm assumptions and DEM resolution limits.
 
 ## Staging
 
-See [geoint-platform/docs/STAGING.md](geoint-platform/docs/STAGING.md) for JWKS + ClickHouse + notifier health before formal verification audit.
+Use the staging pack before any formal verification audit:
 
+```bash
+cd geoint-platform
+cp .env.staging.example .env.staging   # JWKS, secrets, ClickHouse
+./scripts/staging_up.sh
+python scripts/staging_verify.py       # JWKS + CH data + notifier health
+```
+
+Details: [`geoint-platform/docs/STAGING.md`](geoint-platform/docs/STAGING.md)
+
+## Documentation
+
+| Document | Topic |
+|----------|--------|
+| [geoint-platform/README.md](geoint-platform/README.md) | Backend architecture & workers |
+| [geoint-web/README.md](geoint-web/README.md) | Frontend |
+| [docs/PRODUCTION.md](geoint-platform/docs/PRODUCTION.md) | Production deploy checklist |
+| [docs/STAGING.md](geoint-platform/docs/STAGING.md) | Staging: JWKS, ClickHouse, notifier |
+| [docs/SECURITY.md](geoint-platform/docs/SECURITY.md) | Auth, secrets, CORS, bootstrap |
+| [docs/TOPOGRAPHY.md](geoint-platform/docs/TOPOGRAPHY.md) | DEM, LOS, viewshed, quality grades |
+| [docs/ALERTS.md](geoint-platform/docs/ALERTS.md) | Geofence alerts & notifiers |
+| [docs/ANALYTICS.md](geoint-platform/docs/ANALYTICS.md) | ClickHouse product queries |
+| [docs/RBAC.md](geoint-platform/docs/RBAC.md) | Roles & source permissions |
+| [docs/INGESTION.md](geoint-platform/docs/INGESTION.md) | Sources, FIRMS proxy, tiles |
+| [CHANGELOG.md](CHANGELOG.md) | Product version history |
+
+## License
+
+Proprietary / project-defined. Confirm with the repository owner before redistribution.

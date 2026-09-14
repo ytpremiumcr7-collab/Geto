@@ -2,6 +2,11 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.7.2] — 2026-09-14
+
+### Changed
+- Documentation cleanup: removed historical audit/evidence notes; consolidated ops docs under `geoint-platform/docs/`
+
 ## [2.7.1] — 2026-09-14
 
 ### Fixed / hardened
