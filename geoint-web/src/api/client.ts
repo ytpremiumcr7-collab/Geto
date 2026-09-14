@@ -411,3 +411,19 @@ export async function fetchDlq(status = "open") {
 export async function requeueDlq(id: string) {
   return api<{ ok?: boolean }>(`/api/v1/admin/dlq/${id}/requeue`, { method: "POST" });
 }
+
+
+export type AlertDelivery = {
+  id: string;
+  alert_id: string;
+  channel_id: string;
+  channel_type: string;
+  status: string;
+  attempts: number;
+  last_error?: string | null;
+  delivered_at?: string | null;
+};
+
+export async function fetchAlertDeliveries(alertId: string) {
+  return api<{ deliveries: AlertDelivery[] }>(`/api/v1/alerts/${alertId}/deliveries`);
+}

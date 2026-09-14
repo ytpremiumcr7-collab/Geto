@@ -176,6 +176,27 @@ services:
     restart: unless-stopped
     networks: [geoint]
 
+  geoint-alert-notifier:
+    build: .
+    command: ["python", "-m", "app.workers.alert_notifier"]
+    env_file: ${GEOINT_ENV_FILE}
+    environment:
+      APP_ENV: ${APP_ENV:-production}
+      AUTH_DISABLED: "false"
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoint}
+      REDIS_URL: redis://redis:6379/0
+      NATS_URL: nats://nats:4222
+      MINIO_ENDPOINT: minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    restart: unless-stopped
+    networks: [geoint]
+
 volumes:
   pgdata:
   redisdata:

@@ -129,6 +129,16 @@ class Settings(BaseSettings):
     clickhouse_enabled: bool = False
     clickhouse_url: str = "http://localhost:8123"
 
+    # Alert notifier (SMTP)
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_from: str | None = None
+    smtp_use_tls: bool = True
+    alert_notifier_poll_seconds: float = 2.0
+    alert_notifier_batch_size: int = 20
+
 
 @lru_cache
 def get_settings() -> Settings:

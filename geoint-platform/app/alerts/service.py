@@ -216,6 +216,16 @@ class AlertService:
                 occurred_at=occurred_at,
             )
             session.add(alert)
+            await session.flush()  # need alert.id
+            # Enqueue notifier deliveries for rule channels
+            from app.alerts.delivery import DeliveryService
+
+            await DeliveryService().enqueue_for_alert(
+                session,
+                tenant_id=tenant_id,
+                alert=alert,
+                channel_ids=list(rule.channel_ids or []),
+            )
             created.append(_alert_dict(alert))
         if created:
             await session.flush()

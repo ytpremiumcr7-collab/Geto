@@ -1,10 +1,19 @@
 import { useCallback, useEffect, useState } from "react";
-import { ackAlert, fetchAlerts, resolveAlert, type GeofenceAlert } from "@/api/client";
+import {
+  ackAlert,
+  fetchAlertDeliveries,
+  fetchAlerts,
+  resolveAlert,
+  type AlertDelivery,
+  type GeofenceAlert,
+} from "@/api/client";
 
 export function AlertsPanel() {
   const [alerts, setAlerts] = useState<GeofenceAlert[]>([]);
+  const [deliveries, setDeliveries] = useState<Record<string, AlertDelivery[]>>({});
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     try {
@@ -21,6 +30,15 @@ export function AlertsPanel() {
     const t = setInterval(load, 20000);
     return () => clearInterval(t);
   }, [load]);
+
+  async function loadDeliveries(id: string) {
+    try {
+      const r = await fetchAlertDeliveries(id);
+      setDeliveries((prev) => ({ ...prev, [id]: r.deliveries || [] }));
+    } catch {
+      /* ignore */
+    }
+  }
 
   async function onAck(id: string) {
     setBusy(id);
@@ -54,12 +72,34 @@ export function AlertsPanel() {
       <ul className="alert-list">
         {alerts.map((a) => (
           <li key={a.id} className={`alert sev-${a.severity}`}>
-            <div>
-              <strong>{a.event_type}</strong> · {a.entity_id}
+            <div style={{ flex: 1 }}>
+              <button
+                type="button"
+                className="ghost"
+                onClick={() => {
+                  const next = openId === a.id ? null : a.id;
+                  setOpenId(next);
+                  if (next) loadDeliveries(next);
+                }}
+              >
+                <strong>{a.event_type}</strong> · {a.entity_id}
+              </button>
               <br />
               <span className="muted">
                 {a.severity} · {a.occurred_at?.slice(0, 19) || "—"}
               </span>
+              {openId === a.id && (
+                <ul className="simple-list muted" style={{ marginTop: 6 }}>
+                  {(deliveries[a.id] || []).length === 0 && <li>Sin entregas aún</li>}
+                  {(deliveries[a.id] || []).map((d) => (
+                    <li key={d.id}>
+                      {d.channel_type}: <strong>{d.status}</strong>
+                      {d.attempts > 0 ? ` ×${d.attempts}` : ""}
+                      {d.last_error ? ` — ${d.last_error.slice(0, 80)}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
             <div className="row gap">
               <button disabled={busy === a.id} onClick={() => onAck(a.id)}>

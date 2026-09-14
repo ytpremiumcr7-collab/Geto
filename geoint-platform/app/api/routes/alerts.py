@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.alerts.delivery import DeliveryService
 from app.alerts.service import AlertService
 from app.auth.dependencies import get_current_principal, require_roles
 from app.auth.models import Principal
@@ -145,3 +146,15 @@ async def resolve_alert(
     if not item:
         raise HTTPException(status_code=404, detail="Alert not found")
     return item
+
+
+
+@router.get("/{alert_id}/deliveries")
+async def list_deliveries(
+    alert_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+):
+    await set_tenant(db, principal.tenant_id)
+    items = await DeliveryService().list_for_alert(db, principal.tenant_id, alert_id)
+    return {"deliveries": items, "alert_id": str(alert_id)}
