@@ -32,3 +32,5 @@ Thumbs.db
 pgdata/
 miniodata/
 natsdata/
+geoint_deploy_key
+geoint_deploy_key.pub
