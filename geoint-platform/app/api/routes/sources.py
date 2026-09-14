@@ -34,6 +34,7 @@ async def firms_wms_info(
 ):
     """Plantilla WMS FIRMS si FIRMS_MAP_KEY está en env."""
     from app.core.config import settings
+
     if not settings.firms_map_key:
         return {"available": False, "detail": "FIRMS_MAP_KEY not configured"}
     key = settings.firms_map_key
@@ -50,7 +51,6 @@ async def firms_wms_info(
         "tile_url": tile_url,
         "attribution": "NASA FIRMS",
     }
-
 
 
 @router.get("/{source_id}/health")

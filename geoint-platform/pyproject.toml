@@ -69,9 +69,26 @@ testpaths = ["tests"]
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+exclude = [
+    ".git",
+    ".venv",
+    "venv",
+    "__pycache__",
+    "migrations",
+]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "UP"]
+ignore = [
+    "B008",  # FastAPI Depends() in defaults is the documented pattern
+    "E402",  # intentional late imports (pytest.importorskip, optional deps)
+    "B007",  # unused loop vars sometimes intentional
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["E402", "F401"]
+"scripts/**/*.py" = ["E402", "F401"]
+"app/workers/**/*.py" = ["E402"]
 
 [tool.mypy]
 python_version = "3.12"

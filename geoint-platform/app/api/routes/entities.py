@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
+from geoalchemy2.shape import to_shape
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_principal
 from app.auth.models import Principal
 from app.db.repositories import EntityRepository, ObservationRepository
 from app.db.session import get_db
-from geoalchemy2.shape import to_shape
 from app.db.tenant import set_tenant
 
 router = APIRouter(

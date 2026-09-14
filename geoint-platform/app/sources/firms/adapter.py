@@ -1,7 +1,8 @@
 import csv
 import io
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
@@ -11,7 +12,6 @@ from app.sources.base import SourceAdapter, SourceMetadata
 
 
 class NASAFIRMSAdapter(SourceAdapter):
-
     metadata = SourceMetadata(
         source_id="nasa_firms",
         source_type="wildfire",
@@ -46,9 +46,7 @@ class NASAFIRMSAdapter(SourceAdapter):
 
     async def fetch(self) -> Any:
         if not settings.firms_map_key:
-            raise RuntimeError(
-                "FIRMS_MAP_KEY is not configured"
-            )
+            raise RuntimeError("FIRMS_MAP_KEY is not configured")
 
         url = (
             "https://firms.modaps.eosdis.nasa.gov/"
@@ -71,12 +69,9 @@ class NASAFIRMSAdapter(SourceAdapter):
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
 
-        reader = csv.DictReader(
-            io.StringIO(raw_data)
-        )
+        reader = csv.DictReader(io.StringIO(raw_data))
 
         for row in reader:
-
             try:
                 latitude = float(row["latitude"])
                 longitude = float(row["longitude"])
@@ -98,7 +93,7 @@ class NASAFIRMSAdapter(SourceAdapter):
                     observed_at = datetime.strptime(
                         f"{acq_date} {hhmm}",
                         "%Y-%m-%d %H%M",
-                    ).replace(tzinfo=timezone.utc)
+                    ).replace(tzinfo=UTC)
                 except ValueError:
                     pass
 
@@ -123,9 +118,7 @@ class NASAFIRMSAdapter(SourceAdapter):
                     lon=longitude,
                     lat=latitude,
                 ),
-                confidence=_parse_confidence(
-                    row.get("confidence")
-                ),
+                confidence=_parse_confidence(row.get("confidence")),
                 attributes={
                     "satellite": row.get("satellite"),
                     "instrument": row.get("instrument"),
@@ -170,4 +163,3 @@ def _parse_confidence(value: str | None) -> float | None:
 
     except ValueError:
         return None
-

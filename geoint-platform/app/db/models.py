@@ -3,11 +3,10 @@ from datetime import datetime
 
 from geoalchemy2 import Geometry
 from sqlalchemy import (
-    Boolean,
+    JSON,
     DateTime,
     Float,
     Index,
-    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -38,12 +37,8 @@ class Entity(Base):
     entity_id: Mapped[str] = mapped_column(String(255))
     entity_type: Mapped[str] = mapped_column(String(64))
 
-    first_seen: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
-    last_seen: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True)
-    )
+    first_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_seen: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     properties: Mapped[dict | None] = mapped_column(JSON)
 
@@ -82,9 +77,7 @@ class Observation(Base):
     entity_type: Mapped[str] = mapped_column(String(64))
 
     source_id: Mapped[str] = mapped_column(String(128))
-    source_record_id: Mapped[str | None] = mapped_column(
-        String(255)
-    )
+    source_record_id: Mapped[str | None] = mapped_column(String(255))
 
     observed_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -136,4 +129,3 @@ class SourceRun(Base):
     records_normalized: Mapped[int] = mapped_column(default=0)
 
     error: Mapped[str | None] = mapped_column(Text)
-

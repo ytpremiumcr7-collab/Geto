@@ -28,10 +28,10 @@ class SourceJob(Base):
         Index("ix_source_jobs_due", "enabled", "next_run_at", "status"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    tenant_id: Mapped[str] = mapped_column(
+        String(128), nullable=False, default="default", index=True
     )
-    tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, default="default", index=True)
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     source_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     job_type: Mapped[str] = mapped_column(String(64), nullable=False, default="poll")
@@ -69,9 +69,7 @@ class ProcessedMessage(Base):
         Index("ix_processed_messages_created", "created_at"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     message_id: Mapped[str] = mapped_column(String(255), nullable=False)
     subject: Mapped[str] = mapped_column(String(255), nullable=False)
     source_id: Mapped[str | None] = mapped_column(String(128))

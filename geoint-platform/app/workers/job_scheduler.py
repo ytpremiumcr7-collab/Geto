@@ -25,12 +25,8 @@ class JobScheduler:
         poll_interval: float | None = None,
         lease_seconds: int | None = None,
     ):
-        self.poll_interval = poll_interval or float(
-            os.getenv("JOB_POLL_INTERVAL_SECONDS", "2")
-        )
-        self.lease_seconds = lease_seconds or int(
-            os.getenv("JOB_LEASE_SECONDS", "120")
-        )
+        self.poll_interval = poll_interval or float(os.getenv("JOB_POLL_INTERVAL_SECONDS", "2"))
+        self.lease_seconds = lease_seconds or int(os.getenv("JOB_LEASE_SECONDS", "120"))
         self.worker_id = os.getenv("WORKER_ID") or (
             f"{socket.gethostname()}-{os.getpid()}-{uuid4().hex[:8]}"
         )
@@ -57,6 +53,7 @@ class JobScheduler:
         async with SessionLocal() as session:
             # RLS: workers use reserved tenant marker so FORCE RLS policies allow claim
             from sqlalchemy import text
+
             await session.execute(
                 text("SELECT set_config('app.tenant_id', :tid, true)"),
                 {"tid": "__system__"},

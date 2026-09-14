@@ -3,7 +3,8 @@
 Use SourceDispatcher (app.ingestion.dispatcher) for production ingestion
 via SourceJobs + NATS. Do not extend this module.
 """
-from datetime import datetime, timezone
+
+from datetime import UTC, datetime
 
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,7 +15,6 @@ from app.core.telemetry import (
     OBSERVATIONS_TOTAL,
 )
 from app.db.repositories import EntityRepository, ObservationRepository
-from app.domain.models import Observation
 from app.infrastructure.nats_bus import EventBus
 from app.infrastructure.object_store import ObjectStore
 from app.sources.base import SourceAdapter
@@ -23,7 +23,6 @@ log = structlog.get_logger()
 
 
 class IngestionPipeline:
-
     def __init__(
         self,
         session: AsyncSession,
@@ -47,9 +46,7 @@ class IngestionPipeline:
         try:
             raw = await adapter.fetch(**kwargs)
 
-            raw_key = self.object_store.make_key(
-                source_id
-            )
+            raw_key = self.object_store.make_key(source_id)
 
             raw_uri = self.object_store.put_json(
                 raw_key,
@@ -58,17 +55,13 @@ class IngestionPipeline:
 
             observations = 0
 
-            observation_repo = ObservationRepository(
-                self.session
-            )
+            observation_repo = ObservationRepository(self.session)
 
-            entity_repo = EntityRepository(
-                self.session
-            )
+            entity_repo = EntityRepository(self.session)
 
             async for observation in adapter.normalize(
                 raw,
-                datetime.now(timezone.utc),
+                datetime.now(UTC),
             ):
                 try:
                     await entity_repo.upsert(
@@ -108,7 +101,6 @@ class IngestionPipeline:
             return observations
 
         except Exception:
-
             INGESTION_TOTAL.labels(
                 source_id,
                 "error",
@@ -122,11 +114,6 @@ class IngestionPipeline:
             raise
 
         finally:
-
-            INGESTION_DURATION.labels(
-                source_id
-            ).observe(
-                __import__("time").perf_counter()
-                - started
+            INGESTION_DURATION.labels(source_id).observe(
+                __import__("time").perf_counter() - started
             )
-

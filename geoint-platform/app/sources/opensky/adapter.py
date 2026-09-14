@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
@@ -10,7 +11,6 @@ from app.sources.opensky.token import OpenSkyTokenManager
 
 
 class OpenSkyAdapter(SourceAdapter):
-
     metadata = SourceMetadata(
         source_id="opensky",
         source_type="adsb",
@@ -40,10 +40,7 @@ class OpenSkyAdapter(SourceAdapter):
         try:
             headers = await self._headers()
 
-            async with httpx.AsyncClient(
-                timeout=settings.opensky_timeout_seconds
-            ) as client:
-
+            async with httpx.AsyncClient(timeout=settings.opensky_timeout_seconds) as client:
                 response = await client.get(
                     f"{settings.opensky_base_url}/states/all",
                     params={
@@ -84,10 +81,7 @@ class OpenSkyAdapter(SourceAdapter):
         if lomax is not None:
             params["lomax"] = lomax
 
-        async with httpx.AsyncClient(
-            timeout=settings.opensky_timeout_seconds
-        ) as client:
-
+        async with httpx.AsyncClient(timeout=settings.opensky_timeout_seconds) as client:
             response = await client.get(
                 f"{settings.opensky_base_url}/states/all",
                 params=params,
@@ -117,7 +111,6 @@ class OpenSkyAdapter(SourceAdapter):
         states = raw_data.get("states") or []
 
         for state in states:
-
             if len(state) < 8:
                 continue
 
@@ -132,7 +125,7 @@ class OpenSkyAdapter(SourceAdapter):
             timestamp = (
                 datetime.fromtimestamp(
                     state[3],
-                    tz=timezone.utc,
+                    tz=UTC,
                 )
                 if state[3]
                 else received_at
@@ -149,40 +142,16 @@ class OpenSkyAdapter(SourceAdapter):
                     lon=longitude,
                     lat=latitude,
                     altitude_m=(
-                        state[7]
-                        if state[7] is not None
-                        else state[13]
-                        if len(state) > 13
-                        else None
+                        state[7] if state[7] is not None else state[13] if len(state) > 13 else None
                     ),
                 ),
-                speed_mps=(
-                    state[9]
-                    if len(state) > 9
-                    else None
-                ),
-                heading_deg=(
-                    state[10]
-                    if len(state) > 10
-                    else None
-                ),
+                speed_mps=(state[9] if len(state) > 9 else None),
+                heading_deg=(state[10] if len(state) > 10 else None),
                 attributes={
-                    "callsign": (
-                        state[1].strip()
-                        if state[1]
-                        else None
-                    ),
+                    "callsign": (state[1].strip() if state[1] else None),
                     "on_ground": state[8],
-                    "vertical_rate_mps": (
-                        state[11]
-                        if len(state) > 11
-                        else None
-                    ),
-                    "squawk": (
-                        state[14]
-                        if len(state) > 14
-                        else None
-                    ),
+                    "vertical_rate_mps": (state[11] if len(state) > 11 else None),
+                    "squawk": (state[14] if len(state) > 14 else None),
                 },
                 provenance={
                     "source_id": "opensky",
@@ -190,4 +159,3 @@ class OpenSkyAdapter(SourceAdapter):
                 },
                 raw_payload=state,
             )
-

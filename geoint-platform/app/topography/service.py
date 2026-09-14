@@ -4,15 +4,17 @@ from __future__ import annotations
 
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
 try:
     import structlog
+
     log = structlog.get_logger()
 except ImportError:
     import logging
+
     log = logging.getLogger(__name__)
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +40,6 @@ from app.topography.providers import (
 from app.topography.repository import DemRepository
 
 
-
 class TopographyService:
     def __init__(self, session: AsyncSession | None = None):
         self.session = session
@@ -50,9 +51,7 @@ class TopographyService:
 
     # ── catalog ─────────────────────────────────────────────
 
-    async def register_dem(
-        self, tenant_id: str, body: DemAssetCreate
-    ) -> dict[str, Any]:
+    async def register_dem(self, tenant_id: str, body: DemAssetCreate) -> dict[str, Any]:
         if self.session is None:
             raise RuntimeError("DB session required for catalog")
         self._validate_file_uri(body.file_uri)
@@ -113,7 +112,7 @@ class TopographyService:
         dem_id: str | None = None,
         preferred_provider: DemProvider | None = None,
     ) -> ElevationResponse:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
 
         # 1) explicit dem_id
         asset = None
@@ -205,11 +204,7 @@ class TopographyService:
             for lon, lat, dist in densified:
                 t = await self.terrarium.sample_point(lon, lat)
                 elev = t["elevation_m"] if t else None
-                pts.append(
-                    ProfilePoint(
-                        distance_m=dist, lon=lon, lat=lat, elevation_m=elev
-                    )
-                )
+                pts.append(ProfilePoint(distance_m=dist, lon=lon, lat=lat, elevation_m=elev))
             total = pts[-1].distance_m if pts else 0.0
             return ProfileResponse(
                 points=pts,
@@ -257,15 +252,11 @@ class TopographyService:
         try:
             work_path = path
             if bbox and len(bbox) == 4:
-                with tempfile.NamedTemporaryFile(
-                    suffix="_clip.tif", delete=False
-                ) as ctmp:
+                with tempfile.NamedTemporaryFile(suffix="_clip.tif", delete=False) as ctmp:
                     clipped_path = ctmp.name
                 self.engine.clip_bbox(path, clipped_path, bbox)
                 work_path = clipped_path
-            with tempfile.NamedTemporaryFile(
-                suffix=f"_{operation}.tif", delete=False
-            ) as tmp:
+            with tempfile.NamedTemporaryFile(suffix=f"_{operation}.tif", delete=False) as tmp:
                 out_path = tmp.name
             if operation == "slope":
                 stats = self.engine.slope_raster(work_path, out_path)
@@ -317,9 +308,7 @@ class TopographyService:
         target_height_m: float = 0.0,
         dem_id: str | None = None,
     ) -> LosResponse:
-        asset = await self._pick_asset(
-            tenant_id, observer_lon, observer_lat, dem_id
-        )
+        asset = await self._pick_asset(tenant_id, observer_lon, observer_lat, dem_id)
         if not asset:
             return LosResponse(
                 visible=False,
@@ -390,9 +379,7 @@ class TopographyService:
             raise ValueError(f"DEM not found: {dem_id}")
         path = await self._resolve_raster(asset["file_uri"])
         try:
-            with tempfile.NamedTemporaryFile(
-                suffix="_viewshed.tif", delete=False
-            ) as tmp:
+            with tempfile.NamedTemporaryFile(suffix="_viewshed.tif", delete=False) as tmp:
                 out_path = tmp.name
             self.engine.viewshed(
                 path,
@@ -429,7 +416,6 @@ class TopographyService:
             self._cleanup_temp(path, asset["file_uri"])
 
     # ── helpers ─────────────────────────────────────────────
-
 
     async def slope_preview(
         self,
@@ -468,10 +454,10 @@ class TopographyService:
         finally:
             self._cleanup_temp(path, asset["file_uri"])
 
-
     @staticmethod
     def _validate_file_uri(file_uri: str) -> None:
         from app.core.config import settings
+
         raw = getattr(settings, "dem_allowed_key_prefixes", None) or "dem/,derived/"
         if isinstance(raw, str):
             allowed_prefixes = tuple(x.strip() for x in raw.split(",") if x.strip())
@@ -529,13 +515,9 @@ class TopographyService:
                 raise ValueError(f"Invalid s3 uri: {file_uri}")
             bucket, key = parts
             if bucket != bucket_allowed:
-                raise ValueError(
-                    f"s3 bucket not allowed: {bucket} (expected {bucket_allowed})"
-                )
+                raise ValueError(f"s3 bucket not allowed: {bucket} (expected {bucket_allowed})")
             if not key.startswith(allowed_prefixes):
-                raise ValueError(
-                    f"s3 key must start with one of {allowed_prefixes}: {key}"
-                )
+                raise ValueError(f"s3 key must start with one of {allowed_prefixes}: {key}")
             # path traversal
             if ".." in key.split("/"):
                 raise ValueError("invalid s3 key")

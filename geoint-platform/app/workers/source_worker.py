@@ -14,12 +14,12 @@ from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.db.models_dlq import DlqMessage
 from app.db.session import SessionLocal
 from app.ingestion.dispatcher import SourceDispatcher
 from app.jobs.repository import IdempotencyRepository, JobRepository
 from app.messaging.jetstream import JetStreamClient
 from app.messaging.subjects import JOBS_PREFIX
-from app.db.models_dlq import DlqMessage
 
 log = structlog.get_logger()
 
@@ -172,9 +172,7 @@ class SourceWorker:
                     job_id_raw = body.get("job_id")
                     if job_id_raw:
                         async with SessionLocal() as session:
-                            await self.jobs.mark_failure(
-                                session, UUID(job_id_raw), str(exc)
-                            )
+                            await self.jobs.mark_failure(session, UUID(job_id_raw), str(exc))
                 except Exception:
                     log.exception("dlq_publish_failed")
                 await msg.ack()
@@ -185,19 +183,18 @@ class SourceWorker:
                 body = json.loads(msg.data.decode()) if msg.data else {}
                 if body.get("job_id"):
                     async with SessionLocal() as session:
-                        await self.jobs.mark_failure(
-                            session, UUID(body["job_id"]), str(exc)
-                        )
+                        await self.jobs.mark_failure(session, UUID(body["job_id"]), str(exc))
             except Exception:
                 pass
             await msg.nak()
 
-
     def stop(self) -> None:
         self._running = False
 
+
 async def main() -> None:
     import signal
+
     configure_logging(settings.log_level)
     worker = SourceWorker()
     loop = asyncio.get_running_loop()

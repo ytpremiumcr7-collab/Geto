@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import math
 import tempfile
 from pathlib import Path
 
@@ -43,7 +42,7 @@ def _make_synthetic_dem(path: str, size: int = 64, base: float = 1000.0):
 def test_terrarium_decode():
     # sea level approx: R=128, G=0, B=0 → 0
     assert abs(decode_terrarium_rgb(128, 0, 0) - 0.0) < 0.01
-    
+
     # 1000 m ≈ R=131, G=232, B=0  (128*256 + 1000 = 33768 → R=131 G=232)
     elev = decode_terrarium_rgb(131, 232, 0)
     assert 999 < elev < 1001
@@ -90,13 +89,19 @@ def test_line_of_sight_visible_flatish():
         data = np.full((32, 32), 500.0, dtype=np.float32)
         transform = from_origin(-99.15, 19.45, 0.001, 0.001)
         with rasterio.open(
-            path, "w", driver="GTiff", height=32, width=32, count=1,
-            dtype="float32", crs="EPSG:4326", transform=transform, nodata=-9999,
+            path,
+            "w",
+            driver="GTiff",
+            height=32,
+            width=32,
+            count=1,
+            dtype="float32",
+            crs="EPSG:4326",
+            transform=transform,
+            nodata=-9999,
         ) as dst:
             dst.write(data, 1)
-        result = engine.line_of_sight(
-            path, -99.14, 19.44, -99.13, 19.43, observer_height_m=2.0
-        )
+        result = engine.line_of_sight(path, -99.14, 19.44, -99.13, 19.43, observer_height_m=2.0)
         assert "visible" in result
         assert isinstance(result["visible"], bool)
         assert len(result["profile"]) >= 2

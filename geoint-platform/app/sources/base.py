@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
+from collections.abc import AsyncIterator
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any
 
 from app.domain.models import Observation
 
@@ -22,7 +23,6 @@ class SourceMetadata:
 
 
 class SourceAdapter(ABC):
-
     metadata: SourceMetadata
 
     @abstractmethod
@@ -40,4 +40,3 @@ class SourceAdapter(ABC):
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
         pass
-

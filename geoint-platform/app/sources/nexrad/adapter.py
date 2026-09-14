@@ -8,8 +8,9 @@ Atribución: NOAA NEXRAD.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 from xml.etree import ElementTree
 
 import httpx
@@ -65,7 +66,7 @@ class NEXRADAdapter(SourceAdapter):
     ) -> Any:
         """Lista claves S3 recientes para un sitio (default KTLX o settings)."""
         site = (site or getattr(settings, "nexrad_default_site", "KTLX")).upper()
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Prefijo típico: YYYY/MM/DD/SITE
         prefix = f"{now:%Y/%m/%d}/{site}/"
         async with httpx.AsyncClient(timeout=45) as client:
@@ -139,8 +140,6 @@ class NEXRADAdapter(SourceAdapter):
         if not m:
             return None
         try:
-            return datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S").replace(
-                tzinfo=timezone.utc
-            )
+            return datetime.strptime(m.group(1) + m.group(2), "%Y%m%d%H%M%S").replace(tzinfo=UTC)
         except ValueError:
             return None

@@ -44,9 +44,7 @@ def test_jwt_encode_rejects_weak_secret(monkeypatch):
     from app.auth.jwt import JWTService
 
     with pytest.raises(RuntimeError):
-        JWTService(secret="change-me-jwt").encode(
-            user_id="u", tenant_id="t", roles=["admin"]
-        )
+        JWTService(secret="change-me-jwt").encode(user_id="u", tenant_id="t", roles=["admin"])
 
 
 def test_jwt_roundtrip_strong_secret(monkeypatch):

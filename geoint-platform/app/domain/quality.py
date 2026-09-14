@@ -17,4 +17,3 @@ def calculate_quality(observation: Observation) -> float:
         score *= observation.confidence
 
     return max(0.0, min(1.0, score))
-

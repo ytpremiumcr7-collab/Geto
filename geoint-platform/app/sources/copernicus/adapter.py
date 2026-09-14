@@ -1,5 +1,6 @@
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any
 
 import httpx
 
@@ -9,7 +10,6 @@ from app.sources.base import SourceAdapter, SourceMetadata
 
 
 class CopernicusSTACAdapter(SourceAdapter):
-
     metadata = SourceMetadata(
         source_id="copernicus",
         source_type="satellite_imagery",
@@ -41,9 +41,7 @@ class CopernicusSTACAdapter(SourceAdapter):
     ) -> Any:
 
         payload = {
-            "collections": [
-                settings.copernicus_collection
-            ],
+            "collections": [settings.copernicus_collection],
             "limit": limit,
         }
 
@@ -54,7 +52,6 @@ class CopernicusSTACAdapter(SourceAdapter):
             payload["datetime"] = datetime_range
 
         async with httpx.AsyncClient(timeout=60) as client:
-
             response = await client.post(
                 f"{settings.copernicus_stac_url.rstrip('/')}/search",
                 json=payload,
@@ -71,7 +68,6 @@ class CopernicusSTACAdapter(SourceAdapter):
     ) -> AsyncIterator[Observation]:
 
         for item in raw_data.get("features", []):
-
             item_id = item.get("id")
 
             if not item_id:
@@ -99,9 +95,7 @@ class CopernicusSTACAdapter(SourceAdapter):
 
             if dt:
                 try:
-                    observed_at = datetime.fromisoformat(
-                        dt.replace("Z", "+00:00")
-                    )
+                    observed_at = datetime.fromisoformat(dt.replace("Z", "+00:00"))
                 except Exception:
                     pass
 
@@ -116,15 +110,9 @@ class CopernicusSTACAdapter(SourceAdapter):
                 attributes={
                     "collection": item.get("collection"),
                     "assets": item.get("assets"),
-                    "cloud_cover": properties.get(
-                        "eo:cloud_cover"
-                    ),
-                    "platform": properties.get(
-                        "platform"
-                    ),
-                    "constellation": properties.get(
-                        "constellation"
-                    ),
+                    "cloud_cover": properties.get("eo:cloud_cover"),
+                    "platform": properties.get("platform"),
+                    "constellation": properties.get("constellation"),
                 },
                 provenance={
                     "source_id": "copernicus",
@@ -132,4 +120,3 @@ class CopernicusSTACAdapter(SourceAdapter):
                 },
                 raw_payload=item,
             )
-

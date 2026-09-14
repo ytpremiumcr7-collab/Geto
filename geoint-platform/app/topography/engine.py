@@ -7,17 +7,17 @@ Works on local file paths or paths resolved from MinIO (downloaded to temp).
 from __future__ import annotations
 
 import math
-import os
-import tempfile
-from pathlib import Path
 from typing import Any
 
 import numpy as np
+
 try:
     import structlog
+
     log = structlog.get_logger()
 except ImportError:
     import logging
+
     log = logging.getLogger(__name__)
 
 
@@ -30,8 +30,7 @@ def _require_rasterio():
         return rasterio, rowcol, xy, rio_transform
     except ImportError as e:
         raise RuntimeError(
-            "rasterio is required for topography processing. "
-            "Install with: pip install rasterio"
+            "rasterio is required for topography processing. Install with: pip install rasterio"
         ) from e
 
 
@@ -51,9 +50,7 @@ def _require_gdal():
 class TopographyEngine:
     """Pure processing — no I/O beyond reading raster paths."""
 
-    def sample_elevation(
-        self, raster_path: str, lon: float, lat: float
-    ) -> float | None:
+    def sample_elevation(self, raster_path: str, lon: float, lat: float) -> float | None:
         rasterio, rowcol, xy, rio_transform = _require_rasterio()
         with rasterio.open(raster_path) as ds:
             # reproject point to raster CRS if needed
@@ -72,7 +69,6 @@ class TopographyEngine:
             if nodata is not None and (val == nodata or np.isnan(val)):
                 return None
             return val
-
 
     def clip_bbox(
         self,
@@ -101,11 +97,13 @@ class TopographyEngine:
                 data = ds.read(window=window)
                 transform = window_transform(window, ds.transform)
                 profile = ds.profile.copy()
-                profile.update({
-                    "height": data.shape[1],
-                    "width": data.shape[2],
-                    "transform": transform,
-                })
+                profile.update(
+                    {
+                        "height": data.shape[1],
+                        "width": data.shape[2],
+                        "transform": transform,
+                    }
+                )
                 with rasterio.open(out_path, "w", **profile) as dst:
                     dst.write(data)
                 return out_path
@@ -289,9 +287,7 @@ class TopographyEngine:
         with rasterio.open(raster_path) as ds:
             src_crs = "EPSG:4326"
             if ds.crs and str(ds.crs) not in ("EPSG:4326", "OGC:CRS84"):
-                xs, ys = rio_transform(
-                    src_crs, ds.crs, [observer_lon], [observer_lat]
-                )
+                xs, ys = rio_transform(src_crs, ds.crs, [observer_lon], [observer_lat])
                 ox, oy = xs[0], ys[0]
             else:
                 ox, oy = observer_lon, observer_lat
@@ -335,7 +331,6 @@ class TopographyEngine:
 
     # ── helpers ──────────────────────────────────────────────
 
-
     def slope_preview_png(
         self,
         raster_path: str,
@@ -355,6 +350,7 @@ class TopographyEngine:
                 west, south, east, north = bbox
                 from rasterio.windows import from_bounds
                 from rasterio.windows import transform as window_transform
+
                 window = from_bounds(west, south, east, north, ds.transform)
                 window = window.round_offsets().round_lengths()
                 elev = ds.read(1, window=window).astype("float64")
@@ -363,7 +359,10 @@ class TopographyEngine:
                 elev = ds.read(1).astype("float64")
                 transform = ds.transform
                 west, south, east, north = (
-                    ds.bounds.left, ds.bounds.bottom, ds.bounds.right, ds.bounds.top
+                    ds.bounds.left,
+                    ds.bounds.bottom,
+                    ds.bounds.right,
+                    ds.bounds.top,
                 )
             nodata = ds.nodata
 
@@ -407,10 +406,7 @@ class TopographyEngine:
         p1, p2 = math.radians(lat1), math.radians(lat2)
         dphi = math.radians(lat2 - lat1)
         dl = math.radians(lon2 - lon1)
-        a = (
-            math.sin(dphi / 2) ** 2
-            + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
-        )
+        a = math.sin(dphi / 2) ** 2 + math.cos(p1) * math.cos(p2) * math.sin(dl / 2) ** 2
         return 2 * r * math.asin(math.sqrt(a))
 
     def _densify_line(

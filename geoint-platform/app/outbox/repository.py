@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import select
@@ -47,7 +47,7 @@ class OutboxRepository:
         session: AsyncSession,
         message: OutboxMessage,
     ) -> None:
-        message.published_at = datetime.now(timezone.utc)
+        message.published_at = datetime.now(UTC)
 
     async def mark_failed(
         self,

@@ -7,7 +7,6 @@ from app.core.config import settings
 
 
 class EventBus:
-
     def __init__(self):
         self.nc = None
         self.js: JetStreamContext | None = None
@@ -48,4 +47,3 @@ class EventBus:
     async def close(self):
         if self.nc:
             await self.nc.drain()
-

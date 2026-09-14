@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -10,7 +10,7 @@ async def test_usgs_normalization():
 
     adapter = USGSEarthquakeAdapter()
 
-    received = datetime.now(timezone.utc)
+    received = datetime.now(UTC)
 
     payload = {
         "features": [
@@ -46,4 +46,3 @@ async def test_usgs_normalization():
     assert result[0].position.lat == 19.0
     assert result[0].position.lon == -98.0
     assert result[0].attributes["magnitude"] == 5.4
-

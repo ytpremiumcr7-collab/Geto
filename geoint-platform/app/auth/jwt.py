@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 import jwt
@@ -34,9 +34,7 @@ def _assert_hs256_secret_usable(secret: str | None) -> str:
             "set a strong secret (e.g. openssl rand -hex 32)"
         )
     if len(secret.encode("utf-8")) < 32:
-        raise RuntimeError(
-            "JWT_SECRET must be at least 32 bytes for HS256"
-        )
+        raise RuntimeError("JWT_SECRET must be at least 32 bytes for HS256")
     return secret
 
 
@@ -79,7 +77,7 @@ class JWTService:
             raise RuntimeError("Local encode not supported for RS256 — use your IdP")
         secret = _assert_hs256_secret_usable(self.secret)
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         exp = now + timedelta(minutes=expires_minutes or settings.jwt_expires_minutes)
         payload = {
             "sub": user_id,

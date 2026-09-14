@@ -48,4 +48,3 @@ class Event(BaseModel):
     observed_at: datetime
     severity: Literal["info", "low", "medium", "high", "critical"] = "info"
     payload: dict[str, Any] = Field(default_factory=dict)
-

@@ -1,10 +1,7 @@
-from datetime import datetime, timezone
-
 from app.domain.models import Event, Observation
 
 
 class CorrelationEngine:
-
     def detect(
         self,
         observation: Observation,
@@ -23,34 +20,23 @@ class CorrelationEngine:
                     entity_id=observation.entity_id,
                     observed_at=observation.observed_at,
                     severity="medium",
-                    payload={
-                        "speed_mps":
-                            observation.speed_mps
-                    },
+                    payload={"speed_mps": observation.speed_mps},
                 )
             )
 
-        if (
-            observation.confidence is not None
-            and observation.confidence < 0.5
-        ):
+        if observation.confidence is not None and observation.confidence < 0.5:
             events.append(
                 Event(
                     event_type="low_confidence",
                     entity_id=observation.entity_id,
                     observed_at=observation.observed_at,
                     severity="low",
-                    payload={
-                        "confidence":
-                            observation.confidence
-                    },
+                    payload={"confidence": observation.confidence},
                 )
             )
 
         if observation.entity_type == "earthquake":
-            magnitude = observation.attributes.get(
-                "magnitude"
-            )
+            magnitude = observation.attributes.get("magnitude")
 
             try:
                 magnitude = float(magnitude)
@@ -67,11 +53,8 @@ class CorrelationEngine:
                         entity_id=observation.entity_id,
                         observed_at=observation.observed_at,
                         severity="high",
-                        payload={
-                            "magnitude": magnitude
-                        },
+                        payload={"magnitude": magnitude},
                     )
                 )
 
         return events
-

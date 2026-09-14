@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 import httpx
 
@@ -9,7 +10,6 @@ from app.sources.base import SourceAdapter, SourceMetadata
 
 
 class USGSEarthquakeAdapter(SourceAdapter):
-
     metadata = SourceMetadata(
         source_id="usgs_earthquake",
         source_type="earthquake",
@@ -42,7 +42,6 @@ class USGSEarthquakeAdapter(SourceAdapter):
     ) -> AsyncIterator[Observation]:
 
         for feature in raw_data.get("features", []):
-
             properties = feature.get("properties") or {}
             geometry = feature.get("geometry") or {}
 
@@ -65,7 +64,7 @@ class USGSEarthquakeAdapter(SourceAdapter):
             observed_at = (
                 datetime.fromtimestamp(
                     timestamp_ms / 1000,
-                    tz=timezone.utc,
+                    tz=UTC,
                 )
                 if timestamp_ms
                 else received_at
@@ -81,11 +80,7 @@ class USGSEarthquakeAdapter(SourceAdapter):
                 position=GeoPoint(
                     lon=longitude,
                     lat=latitude,
-                    altitude_m=(
-                        -depth_km * 1000
-                        if depth_km is not None
-                        else None
-                    ),
+                    altitude_m=(-depth_km * 1000 if depth_km is not None else None),
                 ),
                 confidence=None,
                 attributes={
@@ -109,4 +104,3 @@ class USGSEarthquakeAdapter(SourceAdapter):
                 },
                 raw_payload=feature,
             )
-

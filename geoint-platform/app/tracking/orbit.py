@@ -24,18 +24,13 @@ def propagate_tle(
         when.second + when.microsecond / 1e6,
     )
 
-    error, position_km, velocity_km_s = (
-        satellite.sgp4(jd, fr)
-    )
+    error, position_km, velocity_km_s = satellite.sgp4(jd, fr)
 
     if error != 0:
-        raise RuntimeError(
-            f"SGP4 propagation failed: {error}"
-        )
+        raise RuntimeError(f"SGP4 propagation failed: {error}")
 
     return {
         "position_km": position_km,
         "velocity_km_s": velocity_km_s,
         "timestamp": when.isoformat(),
     }
-

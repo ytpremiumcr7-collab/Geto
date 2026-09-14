@@ -2,7 +2,6 @@ import httpx
 
 
 class HttpClient:
-
     def __init__(
         self,
         timeout: float = 20,
@@ -26,4 +25,3 @@ class HttpClient:
 
     async def close(self):
         await self.client.aclose()
-

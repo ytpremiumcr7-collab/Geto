@@ -42,15 +42,14 @@ def validate_csv(path: Path, max_errors: int = 20) -> dict:
         reader = csv.DictReader(f)
         if not reader.fieldnames:
             raise ValueError("CSV sin cabecera")
-        fields_lower = { (h or "").strip().lower(): h for h in reader.fieldnames }
+        fields_lower = {(h or "").strip().lower(): h for h in reader.fieldnames}
         missing = []
         for key, aliases in REQUIRED_ANY.items():
             if not any(a.lower() in fields_lower for a in aliases):
                 missing.append(key)
         if missing:
             raise ValueError(
-                f"Columnas requeridas ausentes: {missing}. "
-                f"Cabecera: {list(reader.fieldnames)}"
+                f"Columnas requeridas ausentes: {missing}. Cabecera: {list(reader.fieldnames)}"
             )
 
         total = 0
@@ -58,7 +57,7 @@ def validate_csv(path: Path, max_errors: int = 20) -> dict:
         errors: list[str] = []
         for i, row in enumerate(reader, start=2):
             total += 1
-            lower = { (k or "").strip().lower(): (v or "").strip() for k, v in row.items() }
+            lower = {(k or "").strip().lower(): (v or "").strip() for k, v in row.items()}
             mmsi = lower.get("mmsi") or row.get("MMSI")
             lat = lower.get("lat") or lower.get("latitude") or row.get("LAT")
             lon = lower.get("lon") or lower.get("longitude") or lower.get("lng") or row.get("LON")
@@ -87,9 +86,6 @@ async def run_ingest(path: Path, dry_run: bool) -> int:
     if dry_run:
         return 0 if report["valid"] > 0 else 1
 
-    from datetime import datetime, timezone
-
-    from app.core.config import settings
     from app.db.session import SessionLocal
     from app.db.tenant import set_tenant
     from app.ingestion.dispatcher import SourceDispatcher

@@ -5,10 +5,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_principal
 from app.auth.models import Principal
-from app.policies.source_access import assert_can_read_source
 from app.db.repositories import ObservationRepository
 from app.db.session import get_db
 from app.db.tenant import set_tenant
+from app.policies.source_access import assert_can_read_source
 
 router = APIRouter(
     prefix="/api/v1/observations",

@@ -55,4 +55,3 @@ def setup_opentelemetry(settings) -> None:
     trace.set_tracer_provider(provider)
 
     FastAPIInstrumentor.instrument()
-

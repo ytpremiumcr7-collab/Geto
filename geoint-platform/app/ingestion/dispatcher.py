@@ -2,33 +2,32 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
+import uuid
+from datetime import UTC, datetime
 from typing import Any
-from uuid import UUID
 
 import structlog
+from geoalchemy2.shape import from_shape
+from shapely.geometry import Point
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.config import settings
-from app.db.models import Observation as ObservationModel
-from app.db.repositories import EntityRepository
-from app.domain.models import Observation
-from app.infrastructure.object_store import ObjectStore
-from app.sources.registry import create_adapters
-from app.resilience.circuit_breaker import CircuitOpenError, get_breaker
-from app.outbox.repository import OutboxRepository
-from app.geofencing.service import GeofenceService
-from app.db.tenant import set_tenant
-from app.policies.source_access import assert_ingestion_allowed
 from app.analytics.clickhouse import ClickHouseSink
-from app.domain.quality import calculate_quality
+from app.core.config import settings
 from app.correlation.engine import CorrelationEngine
+from app.db.models import Observation as ObservationModel
 from app.db.models import SourceRun
+from app.db.repositories import EntityRepository
+from app.db.tenant import set_tenant
+from app.domain.models import Observation
+from app.domain.quality import calculate_quality
+from app.geofencing.service import GeofenceService
+from app.infrastructure.object_store import ObjectStore
 from app.infrastructure.retry import retryable
-import uuid
-from geoalchemy2.shape import from_shape
-from shapely.geometry import Point
+from app.outbox.repository import OutboxRepository
+from app.policies.source_access import assert_ingestion_allowed
+from app.resilience.circuit_breaker import CircuitOpenError, get_breaker
+from app.sources.registry import create_adapters
 
 log = structlog.get_logger()
 
@@ -103,9 +102,11 @@ class SourceDispatcher:
 
         kwargs = _fetch_kwargs(source_id, config)
         try:
+
             @retryable()
             async def _fetch():
                 return await adapter.fetch(**kwargs)
+
             raw = await _fetch()
             breaker.record_success()
         except CircuitOpenError:
@@ -117,7 +118,7 @@ class SourceDispatcher:
         raw_key = self.object_store.make_key(source_id)
         raw_uri = await self.object_store.put_json(raw_key, raw)
 
-        received_at = datetime.now(timezone.utc)
+        received_at = datetime.now(UTC)
         run = SourceRun(
             id=uuid.uuid4(),
             tenant_id=tenant_id,
@@ -147,9 +148,7 @@ class SourceDispatcher:
                 properties=obs.attributes,
                 tenant_id=tenant_id,
             )
-            if await self._insert_observation(
-                session, obs, raw_uri, tenant_id=tenant_id
-            ):
+            if await self._insert_observation(session, obs, raw_uri, tenant_id=tenant_id):
                 inserted += 1
                 ch_rows.append(
                     {
@@ -195,7 +194,7 @@ class SourceDispatcher:
 
         run.records_seen = seen
         run.records_normalized = inserted
-        run.finished_at = datetime.now(timezone.utc)
+        run.finished_at = datetime.now(UTC)
         run.status = "ok"
         outbox = OutboxRepository()
         await outbox.enqueue(

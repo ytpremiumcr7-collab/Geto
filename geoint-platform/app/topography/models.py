@@ -102,9 +102,7 @@ class ProfileResponse(BaseModel):
 class RasterOpRequest(BaseModel):
     dem_id: str
     # optional AOI clip (lon/lat)
-    bbox: list[float] | None = Field(
-        None, description="[west, south, east, north]"
-    )
+    bbox: list[float] | None = Field(None, description="[west, south, east, north]")
 
 
 class RasterOpResponse(BaseModel):
@@ -125,9 +123,7 @@ class LosRequest(BaseModel):
     observer_height_m: float = 1.7
     target_height_m: float = 0.0
     dem_id: str | None = None
-    curvature_coeff: float = Field(
-        0.85714, description="1 - 1/7 refraction approx"
-    )
+    curvature_coeff: float = Field(0.85714, description="1 - 1/7 refraction approx")
 
 
 class LosResponse(BaseModel):

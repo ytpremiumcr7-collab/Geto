@@ -12,13 +12,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import httpx
 import structlog
 from geoalchemy2.shape import from_shape
-from shapely.geometry import LineString, Point, Polygon, shape
-from sqlalchemy import text
+from shapely.geometry import LineString, Point, Polygon
 from sqlalchemy.dialects.postgresql import insert
 
 from app.core.config import settings
@@ -108,7 +107,7 @@ async def upsert_elements(
                 "geometry": from_shape(geom, srid=4326),
                 "tags": tags,
                 "source": "overpass",
-                "updated_at": datetime.now(timezone.utc),
+                "updated_at": datetime.now(UTC),
             }
         )
     if not rows:

@@ -1,6 +1,5 @@
 from functools import lru_cache
 
-from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -40,24 +39,18 @@ class Settings(BaseSettings):
     opensky_client_secret: str | None = None
     opensky_base_url: str = "https://opensky-network.org/api"
     opensky_token_url: str = (
-        "https://auth.opensky-network.org/"
-        "auth/realms/opensky-network/"
-        "protocol/openid-connect/token"
+        "https://auth.opensky-network.org/auth/realms/opensky-network/protocol/openid-connect/token"
     )
     opensky_interval_seconds: int = 30
     opensky_timeout_seconds: float = 20
     # Solo true si uso autorizado (investigación / consentimiento comercial)
     opensky_ingestion_enabled: bool = False
 
-    celestrak_base_url: str = (
-        "https://celestrak.org/NORAD/elements/gp.php"
-    )
+    celestrak_base_url: str = "https://celestrak.org/NORAD/elements/gp.php"
     celestrak_interval_seconds: int = 7200
     celestrak_group: str = "STATIONS"
 
-    usgs_url: str = (
-        "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
-    )
+    usgs_url: str = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson"
     usgs_interval_seconds: int = 60
 
     firms_map_key: str | None = None
@@ -68,17 +61,11 @@ class Settings(BaseSettings):
     # WMS: https://firms.modaps.eosdis.nasa.gov/mapserver/wms/fires/{MAP_KEY}/
     firms_wms_layer: str = "fires_viirs_24"
 
-    aviation_weather_base_url: str = (
-        "https://aviationweather.gov/api/data"
-    )
-    aviation_weather_user_agent: str = (
-        "GEOINT-Platform/2.0 contact@example.com"
-    )
+    aviation_weather_base_url: str = "https://aviationweather.gov/api/data"
+    aviation_weather_user_agent: str = "GEOINT-Platform/2.0 contact@example.com"
     aviation_weather_interval_seconds: int = 300
 
-    copernicus_stac_url: str = (
-        "https://stac.dataspace.copernicus.eu/v1/"
-    )
+    copernicus_stac_url: str = "https://stac.dataspace.copernicus.eu/v1/"
     copernicus_collection: str = "sentinel-2-l2a"
     copernicus_interval_seconds: int = 3600
 
@@ -139,4 +126,3 @@ def get_settings() -> Settings:
 
 
 settings = get_settings()
-

@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any
 
 from geoalchemy2 import Geometry
-from sqlalchemy import DateTime, Index, String, Text, func
+from sqlalchemy import DateTime, Index, String, func
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -21,9 +21,7 @@ class OsmFeature(Base):
         Index("ix_osm_features_tenant_class", "tenant_id", "feature_class"),
     )
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, default="default")
     osm_id: Mapped[str] = mapped_column(String(64), nullable=False)
     feature_class: Mapped[str] = mapped_column(String(64), nullable=False)

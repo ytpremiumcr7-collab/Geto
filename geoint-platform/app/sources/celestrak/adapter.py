@@ -1,5 +1,6 @@
+from collections.abc import AsyncIterator
 from datetime import datetime
-from typing import Any, AsyncIterator
+from typing import Any
 
 import httpx
 
@@ -9,7 +10,6 @@ from app.sources.base import SourceAdapter, SourceMetadata
 
 
 class CelesTrakAdapter(SourceAdapter):
-
     metadata = SourceMetadata(
         source_id="celestrak",
         source_type="orbit",
@@ -43,7 +43,6 @@ class CelesTrakAdapter(SourceAdapter):
     ) -> Any:
 
         async with httpx.AsyncClient(timeout=30) as client:
-
             response = await client.get(
                 settings.celestrak_base_url,
                 params={
@@ -63,7 +62,6 @@ class CelesTrakAdapter(SourceAdapter):
     ) -> AsyncIterator[Observation]:
 
         for item in raw_data:
-
             norad_id = item.get("NORAD_CAT_ID")
 
             if not norad_id:
@@ -96,4 +94,3 @@ class CelesTrakAdapter(SourceAdapter):
                 },
                 raw_payload=item,
             )
-

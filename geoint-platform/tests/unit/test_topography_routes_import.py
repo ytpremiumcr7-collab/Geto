@@ -13,6 +13,7 @@ def test_routes_use_get_db():
 
 def test_clip_bbox_exists():
     from app.topography.engine import TopographyEngine
+
     assert hasattr(TopographyEngine, "clip_bbox")
 
 

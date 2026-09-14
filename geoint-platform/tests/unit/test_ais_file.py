@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -13,7 +13,7 @@ async def test_ais_csv_normalize():
 """
     raw = {"format": "csv", "path": "x.csv", "data": csv_text}
     result = []
-    async for obs in adapter.normalize(raw, datetime.now(timezone.utc)):
+    async for obs in adapter.normalize(raw, datetime.now(UTC)):
         result.append(obs)
 
     assert len(result) == 1
@@ -40,7 +40,7 @@ async def test_ais_geojson_normalize():
         },
     }
     result = []
-    async for obs in adapter.normalize(raw, datetime.now(timezone.utc)):
+    async for obs in adapter.normalize(raw, datetime.now(UTC)):
         result.append(obs)
     assert len(result) == 1
     assert result[0].entity_id == "mmsi:111"

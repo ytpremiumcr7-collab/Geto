@@ -7,8 +7,9 @@ Lista productos recientes (metadatos); no descarga netCDF completo por defecto.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 from xml.etree import ElementTree
 
 import httpx
@@ -41,9 +42,7 @@ class GOESAdapter(SourceAdapter):
     async def health(self) -> bool:
         try:
             async with httpx.AsyncClient(timeout=20) as client:
-                r = await client.get(
-                    self.bucket_url, params={"list-type": "2", "max-keys": "1"}
-                )
+                r = await client.get(self.bucket_url, params={"list-type": "2", "max-keys": "1"})
                 return r.is_success
         except Exception:
             return False
@@ -54,7 +53,7 @@ class GOESAdapter(SourceAdapter):
         max_keys: int = 15,
     ) -> Any:
         product = product or self.product
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         # Prefijo ABI: Product/year/doy/hour/
         doy = now.timetuple().tm_yday
         prefix = f"{product}/{now:%Y}/{doy:03d}/{now:%H}/"
@@ -129,7 +128,7 @@ class GOESAdapter(SourceAdapter):
             return None
         try:
             year, doy, hh, mm, ss = map(int, m.groups())
-            dt = datetime(year, 1, 1, hh, mm, ss, tzinfo=timezone.utc)
+            dt = datetime(year, 1, 1, hh, mm, ss, tzinfo=UTC)
             from datetime import timedelta
 
             return dt + timedelta(days=doy - 1)

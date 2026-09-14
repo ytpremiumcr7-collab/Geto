@@ -1,5 +1,3 @@
-import random
-
 from tenacity import (
     retry,
     retry_if_exception,
@@ -44,4 +42,3 @@ def retryable():
         ),
         reraise=True,
     )
-

@@ -8,9 +8,9 @@ Flujo ops:
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
-from urllib.parse import urlparse
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
+from typing import Any
 
 from minio import Minio
 
@@ -184,12 +184,10 @@ class MinIODropzoneAdapter(SourceAdapter):
                     if isinstance(raw_t, (int, float)):
                         observed_at = datetime.fromtimestamp(
                             raw_t / 1000 if raw_t > 1e12 else raw_t,
-                            tz=timezone.utc,
+                            tz=UTC,
                         )
                     else:
-                        observed_at = datetime.fromisoformat(
-                            str(raw_t).replace("Z", "+00:00")
-                        )
+                        observed_at = datetime.fromisoformat(str(raw_t).replace("Z", "+00:00"))
                 except Exception:
                     pass
                 break

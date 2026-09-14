@@ -9,9 +9,10 @@ from __future__ import annotations
 import csv
 import io
 import json
-from datetime import datetime, timezone
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 from app.core.config import settings
 from app.domain.models import GeoPoint, Observation
@@ -34,9 +35,7 @@ class AISFileAdapter(SourceAdapter):
     )
 
     def __init__(self, path: str | None = None) -> None:
-        self.path = Path(
-            path or getattr(settings, "ais_file_path", None) or "/data/ais/latest.csv"
-        )
+        self.path = Path(path or getattr(settings, "ais_file_path", None) or "/data/ais/latest.csv")
 
     async def health(self) -> bool:
         return self.path.is_file()
@@ -67,9 +66,7 @@ class AISFileAdapter(SourceAdapter):
             async for obs in self._from_csv(raw_data.get("data") or "", received_at):
                 yield obs
 
-    async def _from_geojson(
-        self, data: Any, received_at: datetime
-    ) -> AsyncIterator[Observation]:
+    async def _from_geojson(self, data: Any, received_at: datetime) -> AsyncIterator[Observation]:
         features = []
         if isinstance(data, dict) and data.get("type") == "FeatureCollection":
             features = data.get("features") or []
@@ -85,9 +82,7 @@ class AISFileAdapter(SourceAdapter):
             if not mmsi:
                 continue
             observed_at = self._parse_time(
-                props.get("BaseDateTime")
-                or props.get("basedatetime")
-                or props.get("timestamp"),
+                props.get("BaseDateTime") or props.get("basedatetime") or props.get("timestamp"),
                 received_at,
             )
             yield Observation(
@@ -118,13 +113,11 @@ class AISFileAdapter(SourceAdapter):
                 raw_payload=feature,
             )
 
-    async def _from_csv(
-        self, text: str, received_at: datetime
-    ) -> AsyncIterator[Observation]:
+    async def _from_csv(self, text: str, received_at: datetime) -> AsyncIterator[Observation]:
         reader = csv.DictReader(io.StringIO(text))
         for row in reader:
             # Normalizar claves
-            lower = { (k or "").strip().lower(): v for k, v in row.items() }
+            lower = {(k or "").strip().lower(): v for k, v in row.items()}
             mmsi = lower.get("mmsi") or row.get("MMSI")
             lat = lower.get("lat") or lower.get("latitude") or row.get("LAT")
             lon = lower.get("lon") or lower.get("longitude") or lower.get("lng") or row.get("LON")
@@ -172,9 +165,7 @@ class AISFileAdapter(SourceAdapter):
             return fallback
         if isinstance(value, (int, float)):
             try:
-                return datetime.fromtimestamp(
-                    value / 1000 if value > 1e12 else value, tz=timezone.utc
-                )
+                return datetime.fromtimestamp(value / 1000 if value > 1e12 else value, tz=UTC)
             except (OSError, ValueError, OverflowError):
                 return fallback
         try:
@@ -182,7 +173,7 @@ class AISFileAdapter(SourceAdapter):
         except ValueError:
             for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S"):
                 try:
-                    return datetime.strptime(str(value), fmt).replace(tzinfo=timezone.utc)
+                    return datetime.strptime(str(value), fmt).replace(tzinfo=UTC)
                 except ValueError:
                     continue
         return fallback

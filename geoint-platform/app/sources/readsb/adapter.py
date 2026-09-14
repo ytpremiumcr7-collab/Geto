@@ -7,9 +7,10 @@ Formato típico: { "now": <epoch>, "aircraft": [ { "hex", "lat", "lon", "alt_bar
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from collections.abc import AsyncIterator
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, AsyncIterator
+from typing import Any
 
 from app.core.config import settings
 from app.domain.models import GeoPoint, Observation
@@ -60,7 +61,7 @@ class ReadsbLocalAdapter(SourceAdapter):
         batch_time = received_at
         if isinstance(now_epoch, (int, float)):
             try:
-                batch_time = datetime.fromtimestamp(float(now_epoch), tz=timezone.utc)
+                batch_time = datetime.fromtimestamp(float(now_epoch), tz=UTC)
             except (OSError, ValueError, OverflowError):
                 pass
 
@@ -90,9 +91,7 @@ class ReadsbLocalAdapter(SourceAdapter):
             observed_at = batch_time
             if isinstance(seen, (int, float)) and isinstance(now_epoch, (int, float)):
                 try:
-                    observed_at = datetime.fromtimestamp(
-                        float(now_epoch) - float(seen), tz=timezone.utc
-                    )
+                    observed_at = datetime.fromtimestamp(float(now_epoch) - float(seen), tz=UTC)
                 except (OSError, ValueError, OverflowError):
                     pass
 

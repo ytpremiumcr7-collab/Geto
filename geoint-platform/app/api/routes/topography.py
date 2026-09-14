@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_principal
@@ -70,9 +70,7 @@ async def elevation(
 ):
     await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
-    return await svc.elevation(
-        principal.tenant_id, lat, lon, dem_id, preferred_provider
-    )
+    return await svc.elevation(principal.tenant_id, lat, lon, dem_id, preferred_provider)
 
 
 @router.post("/profile", response_model=ProfileResponse)
@@ -100,9 +98,7 @@ async def slope(
     await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
-        return await svc.raster_op(
-            principal.tenant_id, body.dem_id, "slope", body.bbox
-        )
+        return await svc.raster_op(principal.tenant_id, body.dem_id, "slope", body.bbox)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -116,9 +112,7 @@ async def aspect(
     await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
-        return await svc.raster_op(
-            principal.tenant_id, body.dem_id, "aspect", body.bbox
-        )
+        return await svc.raster_op(principal.tenant_id, body.dem_id, "aspect", body.bbox)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -132,9 +126,7 @@ async def hillshade(
     await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
-        return await svc.raster_op(
-            principal.tenant_id, body.dem_id, "hillshade", body.bbox
-        )
+        return await svc.raster_op(principal.tenant_id, body.dem_id, "hillshade", body.bbox)
     except ValueError as e:
         raise HTTPException(status_code=404, detail=str(e)) from e
 
@@ -214,7 +206,9 @@ async def slope_preview(
         "X-Slope-Min": str(result["stats"]["slope_min"]),
         "X-Slope-Max": str(result["stats"]["slope_max"]),
         "X-Slope-Mean": str(result["stats"]["slope_mean"]),
-        "Access-Control-Expose-Headers": "X-Bounds-West,X-Bounds-South,X-Bounds-East,X-Bounds-North,X-Slope-Min,X-Slope-Max,X-Slope-Mean",
+        "Access-Control-Expose-Headers": (
+            "X-Bounds-West,X-Bounds-South,X-Bounds-East,X-Bounds-North,"
+            "X-Slope-Min,X-Slope-Max,X-Slope-Mean"
+        ),
     }
     return Response(content=result["png"], media_type="image/png", headers=headers)
-

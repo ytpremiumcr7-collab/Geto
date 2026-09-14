@@ -55,9 +55,11 @@ def _bbox_from_raster(path: str) -> tuple[float, float, float, float, str]:
 async def main() -> int:
     ap = argparse.ArgumentParser(description="Ingest/register DEM COG for topography")
     ap.add_argument("path", help="Local .tif/.cog path or s3://bucket/key")
-    ap.add_argument("--provider", default="inegi", choices=[
-        "inegi", "copernicus_dem", "local", "usgs", "opentopography"
-    ])
+    ap.add_argument(
+        "--provider",
+        default="inegi",
+        choices=["inegi", "copernicus_dem", "local", "usgs", "opentopography"],
+    )
     ap.add_argument("--product", required=True, help="Product name e.g. 'CEM 15m zona centro'")
     ap.add_argument("--resolution", type=float, required=True, help="Resolution in meters")
     ap.add_argument("--product-type", default="dtm", choices=["dtm", "dsm", "dem"])
@@ -80,7 +82,6 @@ async def main() -> int:
     local_path: Path | None = None
     file_uri: str
     checksum: str | None = None
-    byte_size: int | None = None
 
     store = ObjectStore()
 
@@ -100,16 +101,13 @@ async def main() -> int:
             print(f"ERROR: file not found: {local_path}", file=sys.stderr)
             return 1
         checksum = _sha256_file(local_path)
-        byte_size = local_path.stat().st_size
         key = args.minio_key or f"dem/{args.provider}/{local_path.name}"
         if args.dry_run:
             file_uri = f"s3://{settings.minio_bucket_raw}/{key}"
             print(f"[dry-run] would upload → {file_uri}")
         else:
             data = local_path.read_bytes()
-            file_uri = await store.put_bytes(
-                key, data, content_type="image/tiff"
-            )
+            file_uri = await store.put_bytes(key, data, content_type="image/tiff")
             print(f"Uploaded → {file_uri}")
 
     # bbox
@@ -158,8 +156,13 @@ async def main() -> int:
         print("  product:", asset.get("product_name"))
         print("  resolution_m:", asset.get("resolution_m"))
         print("  file_uri:", asset.get("file_uri"))
-        print("  bbox:", asset.get("bbox_west"), asset.get("bbox_south"),
-              asset.get("bbox_east"), asset.get("bbox_north"))
+        print(
+            "  bbox:",
+            asset.get("bbox_west"),
+            asset.get("bbox_south"),
+            asset.get("bbox_east"),
+            asset.get("bbox_north"),
+        )
     return 0
 
 

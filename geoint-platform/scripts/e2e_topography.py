@@ -11,6 +11,7 @@ Validates against samples/synthetic_cdmx_dem.tif:
 
 Exit 0 only if all critical checks pass.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -68,9 +69,7 @@ def main() -> int:
         ok("clip_sample", elev2 is not None, f"elev={elev2}")
 
         # 4 LOS on clipped
-        los = engine.line_of_sight(
-            clip, -99.12, 19.38, -99.05, 19.30, observer_height_m=2.0
-        )
+        los = engine.line_of_sight(clip, -99.12, 19.38, -99.05, 19.30, observer_height_m=2.0)
         ok("los_keys", "visible" in los and "profile" in los, f"visible={los.get('visible')}")
 
     # 5 terrarium decode unit
@@ -94,6 +93,7 @@ def main() -> int:
     # 7 object store mock
     try:
         from unittest.mock import MagicMock, patch
+
         import app.infrastructure.object_store as osm
 
         store_data: dict[str, bytes] = {}

@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -18,11 +18,10 @@ async def test_firms_normalization():
 
     async for obs in adapter.normalize(
         payload,
-        datetime.now(timezone.utc),
+        datetime.now(UTC),
     ):
         result.append(obs)
 
     assert len(result) == 1
     assert result[0].entity_type == "fire"
     assert result[0].confidence == 1.0
-

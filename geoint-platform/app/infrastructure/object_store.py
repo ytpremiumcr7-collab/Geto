@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import BytesIO
 
 from minio import Minio
@@ -69,9 +69,7 @@ class ObjectStore:
         content_type: str = "application/octet-stream",
         bucket: str | None = None,
     ) -> str:
-        return await asyncio.to_thread(
-            self._put_bytes_sync, key, data, content_type, bucket
-        )
+        return await asyncio.to_thread(self._put_bytes_sync, key, data, content_type, bucket)
 
     def _get_bytes_sync(self, key: str, bucket: str | None = None) -> bytes:
         b = bucket or settings.minio_bucket_raw
@@ -86,6 +84,6 @@ class ObjectStore:
         return await asyncio.to_thread(self._get_bytes_sync, key, bucket)
 
     def make_key(self, source_id: str, entity_id: str | None = None) -> str:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         suffix = entity_id or "batch"
         return f"{source_id}/{now:%Y/%m/%d}/{now:%H%M%S}_{suffix}.json"

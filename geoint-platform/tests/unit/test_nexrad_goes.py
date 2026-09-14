@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -16,7 +16,7 @@ async def test_nexrad_normalize_from_xml():
     """
     raw = {"site": "KTLX", "xml": xml}
     result = []
-    async for obs in adapter.normalize(raw, datetime.now(timezone.utc)):
+    async for obs in adapter.normalize(raw, datetime.now(UTC)):
         result.append(obs)
     assert len(result) == 1
     assert result[0].entity_id == "nexrad:KTLX"
@@ -31,9 +31,13 @@ async def test_goes_normalize_from_xml():
       <Contents><Key>ABI-L2-CMIPF/2024/001/12/OR_ABI-L2-CMIPF-M6C13_G16_s20240011200000_e20240011200000_c20240011200000.nc</Key></Contents>
     </ListBucketResult>
     """
-    raw = {"product": "ABI-L2-CMIPF", "xml": xml, "bucket_url": "https://noaa-goes16.s3.amazonaws.com"}
+    raw = {
+        "product": "ABI-L2-CMIPF",
+        "xml": xml,
+        "bucket_url": "https://noaa-goes16.s3.amazonaws.com",
+    }
     result = []
-    async for obs in adapter.normalize(raw, datetime.now(timezone.utc)):
+    async for obs in adapter.normalize(raw, datetime.now(UTC)):
         result.append(obs)
     assert len(result) == 1
     assert result[0].source_id == "goes"

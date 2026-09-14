@@ -1,5 +1,4 @@
-from datetime import datetime, timezone
-from uuid import UUID
+from datetime import datetime
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
@@ -11,7 +10,6 @@ from app.domain.models import Observation as ObservationDTO
 
 
 class ObservationRepository:
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
@@ -21,8 +19,9 @@ class ObservationRepository:
         raw_payload_uri: str | None = None,
     ) -> Observation | None:
         """Inserta con ON CONFLICT DO NOTHING. Devuelve None si era duplicado."""
-        from sqlalchemy.dialects.postgresql import insert
         import uuid
+
+        from sqlalchemy.dialects.postgresql import insert
 
         geometry = None
         altitude_m = None
@@ -42,7 +41,7 @@ class ObservationRepository:
             insert(Observation)
             .values(
                 id=row_id,
-                tenant_id=getattr(observation, 'tenant_id', None) or "default",
+                tenant_id=getattr(observation, "tenant_id", None) or "default",
                 entity_id=observation.entity_id,
                 entity_type=observation.entity_type,
                 source_id=observation.source_id,
@@ -79,19 +78,13 @@ class ObservationRepository:
         until: datetime | None = None,
         limit: int = 100,
     ):
-        stmt = select(Observation).order_by(
-            Observation.observed_at.desc()
-        )
+        stmt = select(Observation).order_by(Observation.observed_at.desc())
 
         if entity_id:
-            stmt = stmt.where(
-                Observation.entity_id == entity_id
-            )
+            stmt = stmt.where(Observation.entity_id == entity_id)
 
         if source_id:
-            stmt = stmt.where(
-                Observation.source_id == source_id
-            )
+            stmt = stmt.where(Observation.source_id == source_id)
 
         if since is not None:
             stmt = stmt.where(Observation.observed_at >= since)
@@ -107,7 +100,6 @@ class ObservationRepository:
 
 
 class EntityRepository:
-
     def __init__(self, session: AsyncSession):
         self.session = session
 
@@ -155,11 +147,8 @@ class EntityRepository:
         return entity
 
     async def get(self, entity_id: str):
-        stmt = select(Entity).where(
-            Entity.entity_id == entity_id
-        )
+        stmt = select(Entity).where(Entity.entity_id == entity_id)
 
         result = await self.session.execute(stmt)
 
         return result.scalar_one_or_none()
-

@@ -9,7 +9,7 @@ OpenSky queda encapsulado como GOODMODE_ONLY:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -17,7 +17,7 @@ from fastapi import HTTPException, status
 from app.auth.models import Principal
 
 
-class AccessPolicy(str, Enum):
+class AccessPolicy(StrEnum):
     OPEN = "open"  # cualquier autenticado con rol operator+
     OPERATOR = "operator"  # operator, admin, goodmode
     GOODMODE_ONLY = "goodmode_only"  # solo permiso explícito de lectura

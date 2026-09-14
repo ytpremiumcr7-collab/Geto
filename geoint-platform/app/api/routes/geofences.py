@@ -34,9 +34,7 @@ async def list_geofences(
 ):
     await set_tenant(db, principal.tenant_id)
     result = await db.execute(
-        select(Geofence)
-        .where(Geofence.tenant_id == principal.tenant_id)
-        .order_by(Geofence.name)
+        select(Geofence).where(Geofence.tenant_id == principal.tenant_id).order_by(Geofence.name)
     )
     from geoalchemy2.shape import to_shape
     from shapely.geometry import mapping

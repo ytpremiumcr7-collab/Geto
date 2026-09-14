@@ -31,7 +31,10 @@ async def issue_token(request: Request, body: TokenRequest):
     if not await check_rate_limit(f"auth:{client}", limit=20, window_seconds=60):
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
     if settings.app_env not in ("development", "dev", "test"):
-        if not settings.auth_bootstrap_secret or body.bootstrap_secret != settings.auth_bootstrap_secret:
+        if (
+            not settings.auth_bootstrap_secret
+            or body.bootstrap_secret != settings.auth_bootstrap_secret
+        ):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Token issuance disabled",

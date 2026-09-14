@@ -14,15 +14,15 @@ Cada fuente recibe solo los argumentos que su adapter acepta.
 
 
 import asyncio
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 
 from app.core.config import settings
 from app.db.session import SessionLocal
-from app.ingestion.pipeline import IngestionPipeline
 from app.infrastructure.nats_bus import EventBus
 from app.infrastructure.object_store import ObjectStore
+from app.ingestion.pipeline import IngestionPipeline
 from app.sources.registry import create_adapters
 
 log = structlog.get_logger()
@@ -54,7 +54,7 @@ async def run_source(source_id: str, interval: int) -> None:
 
     try:
         while True:
-            started = datetime.now(timezone.utc)
+            started = datetime.now(UTC)
             try:
                 async with SessionLocal() as session:
                     pipeline = IngestionPipeline(
@@ -66,7 +66,7 @@ async def run_source(source_id: str, interval: int) -> None:
             except Exception:
                 log.exception("source_worker_failed", source=source_id)
 
-            elapsed = (datetime.now(timezone.utc) - started).total_seconds()
+            elapsed = (datetime.now(UTC) - started).total_seconds()
             await asyncio.sleep(max(0, interval - elapsed))
     finally:
         await bus.close()

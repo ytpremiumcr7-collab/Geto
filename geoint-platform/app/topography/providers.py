@@ -18,25 +18,24 @@ from abc import ABC, abstractmethod
 from typing import Any
 
 import httpx
+
 try:
     import structlog
+
     log = structlog.get_logger()
 except ImportError:
     import logging
+
     log = logging.getLogger(__name__)
 
 from app.topography.models import DemProvider
 
-
 # AWS Terrain Tiles (Terrarium encoding) — same source MapLibre uses
-TERRARIUM_URL = (
-    "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
-)
+TERRARIUM_URL = "https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png"
 
 # Simple process-local tile cache to avoid redundant HTTP on dense profiles
 _TILE_CACHE: dict[str, bytes] = {}
 _TILE_CACHE_MAX = 256
-
 
 
 def _lonlat_to_tile(lon: float, lat: float, z: int) -> tuple[int, int]:
@@ -44,11 +43,7 @@ def _lonlat_to_tile(lon: float, lat: float, z: int) -> tuple[int, int]:
     n = 2**z
     x = int((lon + 180.0) / 360.0 * n)
     lat_rad = math.radians(lat)
-    y = int(
-        (1.0 - math.log(math.tan(lat_rad) + 1.0 / math.cos(lat_rad)) / math.pi)
-        / 2.0
-        * n
-    )
+    y = int((1.0 - math.log(math.tan(lat_rad) + 1.0 / math.cos(lat_rad)) / math.pi) / 2.0 * n)
     return x % n, max(0, min(n - 1, y))
 
 
@@ -114,8 +109,8 @@ class AwsTerrariumProvider(DemProviderBase):
     def _decode_png_center(self, png_bytes: bytes) -> float | None:
         """Minimal PNG reader for 256x256 RGB Terrarium tiles."""
         try:
-            from PIL import Image
             import numpy as np
+            from PIL import Image
 
             img = Image.open(io.BytesIO(png_bytes)).convert("RGB")
             arr = np.array(img)

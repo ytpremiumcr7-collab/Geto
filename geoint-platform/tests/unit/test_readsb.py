@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -25,7 +25,7 @@ async def test_readsb_normalize():
         ],
     }
     result = []
-    async for obs in adapter.normalize(payload, datetime.now(timezone.utc)):
+    async for obs in adapter.normalize(payload, datetime.now(UTC)):
         result.append(obs)
 
     assert len(result) == 1

@@ -1,5 +1,6 @@
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import datetime
+from typing import Any
 
 import httpx
 
@@ -9,7 +10,6 @@ from app.sources.base import SourceAdapter, SourceMetadata
 
 
 class AviationWeatherAdapter(SourceAdapter):
-
     metadata = SourceMetadata(
         source_id="aviation_weather",
         source_type="weather",
@@ -25,12 +25,8 @@ class AviationWeatherAdapter(SourceAdapter):
         try:
             async with httpx.AsyncClient(
                 timeout=20,
-                headers={
-                    "User-Agent":
-                        settings.aviation_weather_user_agent
-                },
+                headers={"User-Agent": settings.aviation_weather_user_agent},
             ) as client:
-
                 response = await client.get(
                     f"{settings.aviation_weather_base_url}/metar",
                     params={
@@ -51,12 +47,8 @@ class AviationWeatherAdapter(SourceAdapter):
 
         async with httpx.AsyncClient(
             timeout=30,
-            headers={
-                "User-Agent":
-                    settings.aviation_weather_user_agent
-            },
+            headers={"User-Agent": settings.aviation_weather_user_agent},
         ) as client:
-
             response = await client.get(
                 f"{settings.aviation_weather_base_url}/metar",
                 params={
@@ -81,7 +73,6 @@ class AviationWeatherAdapter(SourceAdapter):
             records = raw_data
 
         for row in records:
-
             station = row.get("icaoId")
 
             lat = row.get("lat")
@@ -135,4 +126,3 @@ class AviationWeatherAdapter(SourceAdapter):
                 },
                 raw_payload=row,
             )
-

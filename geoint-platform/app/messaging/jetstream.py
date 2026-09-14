@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC
 from typing import Any
 from uuid import UUID
 
@@ -11,7 +12,7 @@ from nats.js import JetStreamContext
 from nats.js.api import RetentionPolicy, StorageType, StreamConfig
 
 from app.core.config import settings
-from app.messaging.subjects import JOBS_PREFIX, DLQ_PREFIX
+from app.messaging.subjects import DLQ_PREFIX, JOBS_PREFIX
 
 
 class JetStreamClient:
@@ -87,10 +88,10 @@ class JetStreamClient:
         delivery_count: int,
     ) -> None:
         assert self.js is not None
-        from datetime import datetime, timezone
+        from datetime import datetime
 
         message = {
-            "failed_at": datetime.now(timezone.utc).isoformat(),
+            "failed_at": datetime.now(UTC).isoformat(),
             "source_id": source_id,
             "original_subject": original_subject,
             "delivery_count": delivery_count,

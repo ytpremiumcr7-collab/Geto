@@ -22,8 +22,16 @@ def _dem(path: str, size: int = 100):
     # 0.01 deg ~ 1km, origin -99.5, 19.9
     transform = from_origin(-99.5, 19.9, 0.01, 0.01)
     with rasterio.open(
-        path, "w", driver="GTiff", height=size, width=size, count=1,
-        dtype="float32", crs="EPSG:4326", transform=transform, nodata=-9999,
+        path,
+        "w",
+        driver="GTiff",
+        height=size,
+        width=size,
+        count=1,
+        dtype="float32",
+        crs="EPSG:4326",
+        transform=transform,
+        nodata=-9999,
     ) as dst:
         dst.write(data, 1)
 

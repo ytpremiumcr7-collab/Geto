@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -20,7 +20,7 @@ class JobRepository:
         limit: int = 25,
         lease_seconds: int = 120,
     ) -> list[SourceJob]:
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         lease_until = now + timedelta(seconds=lease_seconds)
 
         stmt = (
@@ -30,9 +30,7 @@ class JobRepository:
                 SourceJob.next_run_at <= now,
                 SourceJob.status.in_(("pending", "retry")),
             )
-            .where(
-                (SourceJob.locked_until.is_(None)) | (SourceJob.locked_until < now)
-            )
+            .where((SourceJob.locked_until.is_(None)) | (SourceJob.locked_until < now))
             .order_by(SourceJob.next_run_at)
             .limit(limit)
             .with_for_update(skip_locked=True)
@@ -56,7 +54,7 @@ class JobRepository:
         if not job:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         job.status = "pending"
         job.next_run_at = now + timedelta(seconds=job.interval_seconds)
         job.locked_until = None
@@ -76,7 +74,7 @@ class JobRepository:
         if not job:
             return
 
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         if job.attempts >= job.max_attempts:
             job.status = "failed"
         else:
@@ -92,9 +90,7 @@ class JobRepository:
 
 class IdempotencyRepository:
     async def is_processed(self, session: AsyncSession, message_id: str) -> bool:
-        stmt = select(ProcessedMessage.id).where(
-            ProcessedMessage.message_id == message_id
-        )
+        stmt = select(ProcessedMessage.id).where(ProcessedMessage.message_id == message_id)
         result = await session.execute(stmt)
         return result.scalar_one_or_none() is not None
 

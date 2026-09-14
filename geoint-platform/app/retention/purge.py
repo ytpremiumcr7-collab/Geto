@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import asyncio
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import structlog
 from sqlalchemy import delete, text
@@ -21,14 +21,12 @@ async def purge_observations() -> int:
     days = settings.observations_retention_days
     if days <= 0:
         return 0
-    cutoff = datetime.now(timezone.utc) - timedelta(days=days)
+    cutoff = datetime.now(UTC) - timedelta(days=days)
     async with SessionLocal() as session:
         # Bypass RLS for maintenance: set tenant wildcard not possible;
         # use table owner connection — purge all tenants older than cutoff.
         await session.execute(text("SET LOCAL row_security = off"))
-        result = await session.execute(
-            delete(Observation).where(Observation.observed_at < cutoff)
-        )
+        result = await session.execute(delete(Observation).where(Observation.observed_at < cutoff))
         await session.commit()
         count = result.rowcount or 0
         log.info("purge_observations", deleted=count, cutoff=cutoff.isoformat())

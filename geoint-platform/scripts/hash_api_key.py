@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 """Genera entrada API_KEY_HASHES: sha256hex:tenant:roles"""
+
 import hashlib
 import sys
+
 
 def main():
     if len(sys.argv) < 3:
@@ -11,6 +13,7 @@ def main():
     roles = sys.argv[3] if len(sys.argv) > 3 else "operator"
     h = hashlib.sha256(raw.encode()).hexdigest()
     print(f"{h}:{tenant}:{roles}")
+
 
 if __name__ == "__main__":
     main()

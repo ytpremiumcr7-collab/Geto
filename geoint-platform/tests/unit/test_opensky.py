@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -36,7 +36,7 @@ async def test_opensky_normalization():
 
     async for obs in adapter.normalize(
         payload,
-        datetime.now(timezone.utc),
+        datetime.now(UTC),
     ):
         result.append(obs)
 
@@ -45,4 +45,3 @@ async def test_opensky_normalization():
     assert result[0].position.lon == -98.0
     assert result[0].position.lat == 19.0
     assert result[0].speed_mps == 220
-

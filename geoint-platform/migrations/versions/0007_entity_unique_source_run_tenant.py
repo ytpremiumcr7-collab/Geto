@@ -4,8 +4,8 @@ Revision ID: 0007_tenant_hardening
 Revises: 0006_osm_rls
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "0007_tenant_hardening"
 down_revision = "0006_osm_rls"

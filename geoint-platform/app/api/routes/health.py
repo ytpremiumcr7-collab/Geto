@@ -10,9 +10,7 @@ router = APIRouter(tags=["health"])
 
 @router.get("/health/live")
 async def liveness():
-    return {
-        "status": "ok"
-    }
+    return {"status": "ok"}
 
 
 @router.get("/health/ready")
@@ -60,4 +58,3 @@ async def readiness():
     )
 
     return result
-

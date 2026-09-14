@@ -4,8 +4,8 @@ Revision ID: 0003_outbox
 Revises: 0002_layer4
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0003_outbox"

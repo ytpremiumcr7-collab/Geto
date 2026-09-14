@@ -4,8 +4,8 @@ Revision ID: 0005_osm
 Revises: 0004_rls_geofence
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from geoalchemy2 import Geometry
 from sqlalchemy.dialects import postgresql
 

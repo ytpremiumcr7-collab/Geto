@@ -13,11 +13,7 @@ async def test_liveness():
         transport=transport,
         base_url="http://test",
     ) as client:
-
-        response = await client.get(
-            "/health/live"
-        )
+        response = await client.get("/health/live")
 
     assert response.status_code == 200
     assert response.json()["status"] == "ok"
-

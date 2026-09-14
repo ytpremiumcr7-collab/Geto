@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
@@ -36,7 +36,7 @@ class DemRepository:
         extra: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         dem_id = str(uuid.uuid4())
-        now = datetime.now(timezone.utc)
+        now = datetime.now(UTC)
         await self.session.execute(
             text(
                 """
@@ -82,9 +82,10 @@ class DemRepository:
 
     async def get(self, dem_id: str, tenant_id: str) -> dict[str, Any] | None:
         row = (
-            await self.session.execute(
-                text(
-                    """
+            (
+                await self.session.execute(
+                    text(
+                        """
                     SELECT id, tenant_id, provider, product_name, product_type,
                            resolution_m, crs, vertical_datum,
                            bbox_west, bbox_south, bbox_east, bbox_north,
@@ -93,10 +94,13 @@ class DemRepository:
                     FROM dem_assets
                     WHERE id = :id AND tenant_id = :tenant_id
                     """
-                ),
-                {"id": dem_id, "tenant_id": tenant_id},
+                    ),
+                    {"id": dem_id, "tenant_id": tenant_id},
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
     async def find_covering(
@@ -116,9 +120,10 @@ class DemRepository:
             provider_clause = "AND provider = :provider"
             params["provider"] = preferred_provider
         row = (
-            await self.session.execute(
-                text(
-                    f"""
+            (
+                await self.session.execute(
+                    text(
+                        f"""
                     SELECT id, tenant_id, provider, product_name, product_type,
                            resolution_m, crs, vertical_datum,
                            bbox_west, bbox_south, bbox_east, bbox_north,
@@ -132,19 +137,21 @@ class DemRepository:
                     ORDER BY resolution_m ASC NULLS LAST
                     LIMIT 1
                     """
-                ),
-                params,
+                    ),
+                    params,
+                )
             )
-        ).mappings().first()
+            .mappings()
+            .first()
+        )
         return dict(row) if row else None
 
-    async def list_assets(
-        self, tenant_id: str, limit: int = 50
-    ) -> list[dict[str, Any]]:
+    async def list_assets(self, tenant_id: str, limit: int = 50) -> list[dict[str, Any]]:
         rows = (
-            await self.session.execute(
-                text(
-                    """
+            (
+                await self.session.execute(
+                    text(
+                        """
                     SELECT id, tenant_id, provider, product_name, product_type,
                            resolution_m, crs, vertical_datum,
                            bbox_west, bbox_south, bbox_east, bbox_north,
@@ -155,8 +162,11 @@ class DemRepository:
                     ORDER BY created_at DESC
                     LIMIT :limit
                     """
-                ),
-                {"tenant_id": tenant_id, "limit": limit},
+                    ),
+                    {"tenant_id": tenant_id, "limit": limit},
+                )
             )
-        ).mappings().all()
+            .mappings()
+            .all()
+        )
         return [dict(r) for r in rows]

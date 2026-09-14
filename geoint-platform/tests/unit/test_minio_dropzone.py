@@ -1,4 +1,4 @@
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -35,7 +35,7 @@ async def test_dropzone_geojson_feature_collection():
     adapter.mark_processed = lambda *a, **k: None  # type: ignore
 
     result = []
-    async for obs in adapter.normalize(payload, datetime.now(timezone.utc)):
+    async for obs in adapter.normalize(payload, datetime.now(UTC)):
         result.append(obs)
 
     assert len(result) == 1

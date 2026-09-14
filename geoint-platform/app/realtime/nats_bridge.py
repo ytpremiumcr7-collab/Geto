@@ -45,9 +45,7 @@ class RealtimeNatsBridge:
             try:
                 payload = json.loads(msg.data.decode())
                 tenant_id = str(
-                    payload.get("tenant_id")
-                    or self._tenant_from_subject(msg.subject)
-                    or "default"
+                    payload.get("tenant_id") or self._tenant_from_subject(msg.subject) or "default"
                 )
                 await manager.publish(
                     tenant_id,

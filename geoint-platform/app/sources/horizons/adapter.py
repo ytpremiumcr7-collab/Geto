@@ -6,8 +6,9 @@ Sin API key. Uso razonable; no martillar el endpoint.
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from datetime import datetime
+from typing import Any
 
 import httpx
 
@@ -37,7 +38,12 @@ class JPLHorizonsAdapter(SourceAdapter):
                 # COMMAND='MB' lista cuerpos menores — respuesta corta de prueba
                 r = await client.get(
                     settings.horizons_base_url,
-                    params={"format": "json", "COMMAND": "'1'", "OBJ_DATA": "YES", "MAKE_EPHEM": "NO"},
+                    params={
+                        "format": "json",
+                        "COMMAND": "'1'",
+                        "OBJ_DATA": "YES",
+                        "MAKE_EPHEM": "NO",
+                    },
                 )
                 return r.is_success
         except Exception:

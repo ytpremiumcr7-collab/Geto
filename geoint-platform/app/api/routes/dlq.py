@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -91,7 +91,7 @@ async def requeue_dlq(
         await js.close()
 
     msg.status = "requeued"
-    msg.resolved_at = datetime.now(timezone.utc)
+    msg.resolved_at = datetime.now(UTC)
     await db.commit()
     return {"id": str(message_id), "status": "requeued"}
 
@@ -107,6 +107,6 @@ async def resolve_dlq(
     if not msg or msg.tenant_id != principal.tenant_id:
         raise HTTPException(status_code=404, detail="DLQ message not found")
     msg.status = "resolved"
-    msg.resolved_at = datetime.now(timezone.utc)
+    msg.resolved_at = datetime.now(UTC)
     await db.commit()
     return {"id": str(message_id), "status": "resolved"}

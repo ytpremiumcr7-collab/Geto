@@ -13,9 +13,7 @@ from app.db.models import Base
 class DlqMessage(Base):
     __tablename__ = "dlq_messages"
 
-    id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
-    )
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id: Mapped[str] = mapped_column(String(128), nullable=False, default="default")
     source_id: Mapped[str] = mapped_column(String(128), nullable=False)
     original_subject: Mapped[str] = mapped_column(String(255), nullable=False)
