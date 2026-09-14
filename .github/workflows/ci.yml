@@ -206,7 +206,7 @@ jobs:
             echo "No Dockerfile in frontend, skipping"
           fi
 
-  # ==================== DEPLOY (optional) ====================
+  # ==================== DEPLOY (real when secrets present) ====================
   deploy-staging:
     name: Deploy to Staging
     runs-on: ubuntu-latest
@@ -216,15 +216,50 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Deploy to staging
+      - name: Check deploy secrets
+        id: gate
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
         run: |
-          echo "Deploying to staging environment..."
-          echo "Commit: ${{ github.sha }}"
-          echo "Branch: ${{ github.ref_name }}"
-          # Wire real deploy (SSH / compose / k8s) here.
+          if [ -z "$DEPLOY_HOST" ] || [ -z "$DEPLOY_USER" ] || [ -z "$DEPLOY_SSH_KEY" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "Deploy secrets not configured (DEPLOY_HOST/USER/SSH_KEY)."
+            echo "Skipping real deploy — not reporting false success."
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          fi
 
-      - name: Deployment notification
-        run: echo "Deployment completed successfully"
+      - name: Install SSH key
+        if: steps.gate.outputs.configured == 'true'
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+        run: |
+          mkdir -p ~/.ssh
+          echo "$DEPLOY_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H "${{ secrets.DEPLOY_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Remote deploy (git pull + deploy.sh up)
+        if: steps.gate.outputs.configured == 'true'
+        env:
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_PATH: ${{ secrets.DEPLOY_PATH }}
+        run: |
+          export DEPLOY_SSH_KEY="$HOME/.ssh/deploy_key"
+          export DEPLOY_PATH="${DEPLOY_PATH:-/opt/geoint}"
+          chmod +x geoint-platform/scripts/deploy.sh
+          geoint-platform/scripts/deploy.sh remote-up
+
+      - name: Deployment summary
+        run: |
+          if [ "${{ steps.gate.outputs.configured }}" = "true" ]; then
+            echo "Staging deploy finished for ${{ github.sha }}"
+          else
+            echo "Staging deploy skipped (configure GitHub Environment secrets to enable)."
+          fi
 
   # ==================== SUMMARY ====================
   ci-summary:

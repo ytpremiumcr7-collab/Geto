@@ -81,9 +81,17 @@ class Settings(BaseSettings):
     prometheus_enabled: bool = True
     metrics_public: bool = False  # if False, /metrics requires auth
 
+    # Edge / CORS — production requires explicit https origins (no *)
+    # Example: CORS_ORIGINS=https://app.example.com,https://ops.example.com
+    cors_origins: str = ""
+    cors_allow_credentials: bool = True
+    cors_allow_http: bool = False  # lab only: allow http:// origins when true
+    # Trusted hosts for reverse-proxy deployments (comma-separated); empty = skip
+    trusted_hosts: str = ""
+
     # Auth
     auth_disabled: bool = False
-    jwt_secret: str = ""  # required: openssl rand -hex 32
+    jwt_secret: str = ""  # HS256 only; rejected if weak. Prefer OIDC in prod.
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "geoint-platform"
     jwt_audience: str = "geoint-api"
@@ -92,8 +100,10 @@ class Settings(BaseSettings):
     api_keys: str | None = None  # LEGACY plaintext key:tenant:roles (prefer api_key_hashes)
     # Formato: sha256hex:tenant:role1,role2;...  (hash SHA-256 hex del secret en bruto)
     api_key_hashes: str | None = None
-    jwt_jwks_url: str | None = None  # OIDC JWKS e.g. https://idp/.well-known/jwks.json
+    jwt_jwks_url: str | None = None  # REQUIRED in production: OIDC JWKS URL
     jwt_tenant_claim: str = "tenant_id"
+    # Emergency only: allow HS256 in production when OIDC is temporarily unavailable
+    allow_hs256_in_production: bool = False
     rate_limit_per_minute: int = 120
     rate_limit_enabled: bool = True
     rate_limit_fail_open: bool = False  # prod: fail-closed if Redis down

@@ -6,6 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import Response
 from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api.routes.dlq import router as dlq_router
 from app.api.routes.entities import router as entities_router
@@ -19,11 +20,15 @@ from app.api.routes.websocket import router as websocket_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.core.security_bootstrap import cors_origin_list, validate_settings
 from app.core.telemetry import setup_opentelemetry
 from app.middleware.rate_limit_mw import RateLimitMiddleware
 
 configure_logging(settings.log_level)
 setup_opentelemetry(settings)
+
+# Fail fast before accepting traffic (P0 production guards)
+validate_settings(settings, role="api")
 
 
 @asynccontextmanager
@@ -54,19 +59,41 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="2.1.0",
+    version="2.2.0",
     lifespan=lifespan,
 )
+
+# Trusted hosts (optional; set TRUSTED_HOSTS=api.example.com,localhost)
+_trusted = [h.strip() for h in (settings.trusted_hosts or "").split(",") if h.strip()]
+if _trusted:
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted)
+
 app.add_middleware(RateLimitMiddleware)
 
-if settings.app_env in ("development", "dev", "test"):
-    app.add_middleware(
-        CORSMiddleware,
-        allow_origins=["*"],
-        allow_credentials=True,
-        allow_methods=["*"],
-        allow_headers=["*"],
-    )
+# CORS: explicit origins in prod (validated by security_bootstrap); * only in dev
+_origins = cors_origin_list(settings)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_origins,
+    allow_credentials=settings.cors_allow_credentials and _origins != ["*"],
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-API-Key",
+        "X-Request-Id",
+        "Accept",
+    ],
+    expose_headers=[
+        "X-Bounds-West",
+        "X-Bounds-South",
+        "X-Bounds-East",
+        "X-Bounds-North",
+        "X-Slope-Min",
+        "X-Slope-Max",
+        "X-Slope-Mean",
+    ],
+)
 
 app.include_router(health_router)
 app.include_router(auth_router)
@@ -88,7 +115,6 @@ async def metrics(request: Request):
         auth = request.headers.get("authorization") or request.headers.get("x-api-key")
         if not auth:
             return Response(status_code=401, content=b"Unauthorized")
-        # Validate via JWTService / API key when present
         try:
             from app.auth.jwt import JWTService
 

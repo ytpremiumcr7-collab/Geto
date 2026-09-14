@@ -93,6 +93,9 @@ class JobScheduler:
 
 async def main() -> None:
     configure_logging(settings.log_level)
+    from app.core.security_bootstrap import validate_settings
+
+    validate_settings(settings, role="scheduler")
     scheduler = JobScheduler()
     loop = asyncio.get_running_loop()
     for sig in (signal.SIGTERM, signal.SIGINT):

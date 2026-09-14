@@ -67,8 +67,10 @@ class OutboxDispatcher:
 async def main() -> None:
     from app.core.config import settings
     from app.core.logging import configure_logging
+    from app.core.security_bootstrap import validate_settings
 
     configure_logging(settings.log_level)
+    validate_settings(settings, role="outbox")
     dispatcher = OutboxDispatcher()
     await dispatcher.run()
 
