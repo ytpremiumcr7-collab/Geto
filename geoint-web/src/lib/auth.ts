@@ -78,3 +78,14 @@ export function setUser(user: { user_id?: string; tenant_id?: string; roles?: st
   };
   store.setItem(USER_KEY, JSON.stringify(merged));
 }
+
+
+/** Clear client storage and server HttpOnly cookie when cookie mode is on. */
+export async function logoutRemote(): Promise<void> {
+  try {
+    await fetch("/api/v1/auth/logout", { method: "POST", credentials: "include" });
+  } catch {
+    /* ignore network errors on logout */
+  }
+  clearAuth();
+}

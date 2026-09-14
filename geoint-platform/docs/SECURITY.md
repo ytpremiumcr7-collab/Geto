@@ -56,3 +56,24 @@ python scripts/dev_jwks_server.py --port 9090
 ## MinIO
 
 - Set `MINIO_CREATE_BUCKET=false` in staging/prod; provision buckets out-of-band
+
+
+## System worker claim
+
+RLS system policies require **both**:
+
+- `app.tenant_id = '__system__'`
+- `app.worker_mode = '1'`
+
+Application code must call `set_system_worker(session)` (not `set_tenant(..., "__system__")`).
+The process must run with `GEOINT_SYSTEM_WORKER=1` (workers only — never the public API).
+
+## Composite tenant FKs
+
+- `saved_layers (tenant_id, workspace_id)` → `workspaces (tenant_id, id)`
+- `geofence_alert_rules (tenant_id, geofence_id)` → `geofences (tenant_id, id)`
+
+## HttpOnly cookies
+
+Set `AUTH_COOKIE_MODE=true`. `POST /api/v1/auth/token` sets cookie `geoint_access` (HttpOnly).
+`POST /api/v1/auth/logout` clears it. SPA uses `credentials: "include"`. Bearer still works.

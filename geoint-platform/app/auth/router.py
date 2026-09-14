@@ -1,8 +1,8 @@
-"""Emisión de tokens solo en development o con bootstrap secret (ops)."""
+"""Token issuance + optional HttpOnly session cookie (BFF-friendly)."""
 
 from __future__ import annotations
 
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, HTTPException, Request, Response, status
 from pydantic import BaseModel, Field
 
 from app.auth.jwt import JWTService
@@ -22,12 +22,36 @@ class TokenRequest(BaseModel):
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
+    cookie_mode: bool = False
+
+
+def _set_auth_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=settings.auth_cookie_name,
+        value=token,
+        httponly=True,
+        secure=bool(settings.auth_cookie_secure),
+        samesite=str(settings.auth_cookie_samesite or "lax").lower(),  # type: ignore[arg-type]
+        max_age=int(settings.auth_cookie_max_age or 3600),
+        path="/",
+    )
+
+
+def _clear_auth_cookie(response: Response) -> None:
+    response.delete_cookie(
+        key=settings.auth_cookie_name,
+        path="/",
+        secure=bool(settings.auth_cookie_secure),
+        httponly=True,
+        samesite=str(settings.auth_cookie_samesite or "lax").lower(),  # type: ignore[arg-type]
+    )
 
 
 @router.post("/token", response_model=TokenResponse)
-async def issue_token(request: Request, body: TokenRequest):
-    """Solo si AUTH_BOOTSTRAP_SECRET coincide o app_env=development."""
+async def issue_token(request: Request, response: Response, body: TokenRequest):
+    """Issue JWT. In cookie mode also sets HttpOnly cookie (token still returned for SPA bootstrap)."""
     from app.middleware.rate_limit_mw import _client_ip
+
     client = _client_ip(request)
     if not await check_rate_limit(f"auth:{client}", limit=20, window_seconds=60):
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
@@ -48,4 +72,15 @@ async def issue_token(request: Request, body: TokenRequest):
         )
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
-    return TokenResponse(access_token=token)
+
+    cookie_mode = bool(getattr(settings, "auth_cookie_mode", False))
+    if cookie_mode:
+        _set_auth_cookie(response, token)
+    return TokenResponse(access_token=token, cookie_mode=cookie_mode)
+
+
+@router.post("/logout")
+async def logout(response: Response):
+    """Clear HttpOnly auth cookie (no-op for pure Bearer clients)."""
+    _clear_auth_cookie(response)
+    return {"ok": True, "cookie_cleared": True}

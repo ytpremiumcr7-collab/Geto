@@ -27,7 +27,11 @@ export async function api<T = unknown>(
   const token = getToken();
   if (token) headers.set("Authorization", `Bearer ${token}`);
 
-  const res = await fetch(`${BASE}${path}`, { ...options, headers });
+  const res = await fetch(`${BASE}${path}`, {
+    ...options,
+    headers,
+    credentials: "include",
+  });
   if (res.status === 401) {
     clearAuth();
     if (!path.includes("/auth/token")) {

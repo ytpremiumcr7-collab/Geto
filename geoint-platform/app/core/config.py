@@ -93,6 +93,12 @@ class Settings(BaseSettings):
 
     # Auth
     auth_disabled: bool = False
+    auth_cookie_mode: bool = False  # HttpOnly cookie session (BFF-friendly)
+    auth_cookie_name: str = "geoint_access"
+    auth_cookie_secure: bool = True  # set False only for local http
+    auth_cookie_samesite: str = "lax"  # lax|strict|none
+    auth_cookie_max_age: int = 3600
+
     jwt_secret: str = ""  # HS256 only; rejected if weak. Prefer OIDC in prod.
     jwt_algorithm: str = "HS256"
     jwt_issuer: str = "geoint-platform"

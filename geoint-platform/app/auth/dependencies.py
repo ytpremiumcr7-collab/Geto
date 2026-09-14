@@ -6,13 +6,13 @@ import hashlib
 import hmac
 import logging
 
-from fastapi import Depends, HTTPException, Security, status
+from fastapi import Depends, Request, HTTPException, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
 
 from app.auth.jwt import JWTService
 from app.auth.models import Principal
 from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.tenant import set_system_worker, set_tenant
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
@@ -94,6 +94,7 @@ def _api_key_principal(raw_key: str) -> Principal | None:
 
 
 async def get_current_principal(
+    request: Request,
     credentials: HTTPAuthorizationCredentials | None = Security(_bearer),
     api_key: str | None = Security(_api_key_header),
 ) -> Principal:
@@ -118,6 +119,7 @@ async def get_current_principal(
             detail="Invalid API key",
         )
 
+    # Bearer header first
     if credentials and credentials.scheme.lower() == "bearer" and credentials.credentials:
         try:
             return JWTService().decode(credentials.credentials)
@@ -127,6 +129,19 @@ async def get_current_principal(
                 detail="Invalid or expired token",
                 headers={"WWW-Authenticate": "Bearer"},
             ) from None
+
+    # HttpOnly cookie (BFF / AUTH_COOKIE_MODE)
+    if getattr(settings, "auth_cookie_mode", False):
+        cookie_name = getattr(settings, "auth_cookie_name", "geoint_access") or "geoint_access"
+        raw = request.cookies.get(cookie_name)
+        if raw:
+            try:
+                return JWTService().decode(raw)
+            except Exception:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Invalid or expired session cookie",
+                ) from None
 
     raise HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -166,6 +181,6 @@ async def get_tenant_db(
 async def get_system_db(
     session: AsyncSession = Depends(get_db),
 ) -> AsyncSession:
-    """Worker/system path: app.tenant_id=__system__. Not for user requests."""
-    await set_tenant(session, "__system__")
+    """Worker path only — dual RLS claim via set_system_worker()."""
+    await set_system_worker(session)
     return session

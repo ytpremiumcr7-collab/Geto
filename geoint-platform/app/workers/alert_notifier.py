@@ -18,6 +18,7 @@ from pathlib import Path
 
 import structlog
 from sqlalchemy import text
+from app.db.tenant import set_system_worker, set_tenant
 
 from app.alerts.delivery import DeliveryService
 from app.core.config import settings
@@ -145,16 +146,13 @@ class AlertNotifierWorker:
 
     async def _tick(self) -> None:
         async with SessionLocal() as session:
-            await session.execute(text("SELECT set_config('app.tenant_id', '__system__', true)"))
+            await set_system_worker(session)
             claimed = await self.delivery.claim_batch(session, limit=self.batch)
             if not claimed:
                 await session.commit()
                 return
             for d in claimed:
-                await session.execute(
-                    text("SELECT set_config('app.tenant_id', :tid, true)"),
-                    {"tid": d.tenant_id},
-                )
+                await set_tenant(session, d.tenant_id)
                 try:
                     result = await self.delivery.process_one(session, d)
                     st = result.get("status")
@@ -196,4 +194,6 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    import os
+    os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     main()

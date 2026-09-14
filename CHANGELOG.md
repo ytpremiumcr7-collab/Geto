@@ -2,6 +2,14 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.10.0] — 2026-09-14
+
+### Security / multi-tenant integrity
+- System RLS: requires `app.tenant_id=__system__` **and** `app.worker_mode=1`; `set_system_worker()` + `GEOINT_SYSTEM_WORKER=1`
+- `set_tenant()` refuses `__system__` sentinel
+- Composite FKs: saved_layers→workspaces, geofence_alert_rules→geofences on `(tenant_id, id)`
+- Optional HttpOnly session: `AUTH_COOKIE_MODE`, cookie auth in `get_current_principal`, `/auth/logout`, SPA `credentials: include`
+
 ## [2.9.1] — 2026-09-14
 
 ### Security / supply-chain

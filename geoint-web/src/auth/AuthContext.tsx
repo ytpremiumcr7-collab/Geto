@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 import { fetchMe, type MeResponse } from "@/api/client";
-import { clearAuth, getToken, getUser, setToken, setUser } from "@/lib/auth";
+import { clearAuth, getToken, getUser, setToken, setUser, logoutRemote } from "@/lib/auth";
 
 type AuthState = {
   token: string | null;
@@ -53,7 +53,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
     } catch {
       setMe(null);
-      clearAuth();
+      void logoutRemote(); // clears storage + HttpOnly cookie
+    clearAuth();
     } finally {
       setLoading(false);
     }
@@ -80,6 +81,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const logout = useCallback(() => {
+    void logoutRemote();
     clearAuth();
     setTok(null);
     setUsr(null);
