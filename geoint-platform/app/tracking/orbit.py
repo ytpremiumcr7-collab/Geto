@@ -9,7 +9,6 @@ def propagate_tle(
     line2: str,
     when: datetime,
 ):
-
     satellite = Satrec.twoline2rv(
         line1,
         line2,

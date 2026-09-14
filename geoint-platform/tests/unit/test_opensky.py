@@ -7,7 +7,6 @@ from app.sources.opensky.adapter import OpenSkyAdapter
 
 @pytest.mark.asyncio
 async def test_opensky_normalization():
-
     adapter = OpenSkyAdapter()
 
     payload = {

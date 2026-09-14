@@ -83,6 +83,7 @@ ignore = [
     "B008",  # FastAPI Depends() in defaults is the documented pattern
     "E402",  # intentional late imports (pytest.importorskip, optional deps)
     "B007",  # unused loop vars sometimes intentional
+    "UP038",  # isinstance(x, (A, B)) remains clearer than A | B for many readers
 ]
 
 [tool.ruff.lint.per-file-ignores]

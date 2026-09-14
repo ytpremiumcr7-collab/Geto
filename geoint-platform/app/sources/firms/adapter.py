@@ -68,7 +68,6 @@ class NASAFIRMSAdapter(SourceAdapter):
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-
         reader = csv.DictReader(io.StringIO(raw_data))
 
         for row in reader:

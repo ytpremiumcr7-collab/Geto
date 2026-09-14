@@ -7,7 +7,6 @@ from app.sources.firms.adapter import NASAFIRMSAdapter
 
 @pytest.mark.asyncio
 async def test_firms_normalization():
-
     adapter = NASAFIRMSAdapter()
 
     payload = """latitude,longitude,bright_ti4,acq_date,acq_time,satellite,confidence

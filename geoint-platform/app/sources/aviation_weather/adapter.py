@@ -44,7 +44,6 @@ class AviationWeatherAdapter(SourceAdapter):
         self,
         station_ids: str = "KMCI",
     ) -> Any:
-
         async with httpx.AsyncClient(
             timeout=30,
             headers={"User-Agent": settings.aviation_weather_user_agent},
@@ -66,7 +65,6 @@ class AviationWeatherAdapter(SourceAdapter):
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-
         if isinstance(raw_data, dict):
             records = raw_data.get("data", [])
         else:

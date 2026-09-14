@@ -177,8 +177,7 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
     if errors:
         msg = (
             f"Security bootstrap failed for APP_ENV={env!r} (role={role}). "
-            "Fix the following before starting:\n  - "
-            + "\n  - ".join(errors)
+            "Fix the following before starting:\n  - " + "\n  - ".join(errors)
         )
         log.error(msg)
         raise SecurityBootstrapError(msg)

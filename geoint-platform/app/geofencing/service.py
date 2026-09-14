@@ -108,9 +108,7 @@ class GeofenceService:
 
                 alert_svc = AlertService()
                 for ev in events:
-                    await alert_svc.emit_from_geofence_event(
-                        session, tenant_id=tenant_id, event=ev
-                    )
+                    await alert_svc.emit_from_geofence_event(session, tenant_id=tenant_id, event=ev)
             except Exception:
                 # Alerts must not break the observation pipeline
                 pass

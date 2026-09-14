@@ -7,7 +7,6 @@ from app.sources.usgs.adapter import USGSEarthquakeAdapter
 
 @pytest.mark.asyncio
 async def test_usgs_normalization():
-
     adapter = USGSEarthquakeAdapter()
 
     received = datetime.now(UTC)

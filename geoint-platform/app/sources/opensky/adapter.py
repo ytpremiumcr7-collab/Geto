@@ -64,7 +64,6 @@ class OpenSkyAdapter(SourceAdapter):
         lamax: float | None = None,
         lomax: float | None = None,
     ) -> Any:
-
         headers = await self._headers()
 
         params = {}
@@ -107,7 +106,6 @@ class OpenSkyAdapter(SourceAdapter):
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-
         states = raw_data.get("states") or []
 
         for state in states:

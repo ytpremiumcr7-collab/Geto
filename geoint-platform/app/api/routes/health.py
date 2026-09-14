@@ -15,7 +15,6 @@ async def liveness():
 
 @router.get("/health/ready")
 async def readiness():
-
     result = {
         "status": "ok",
         "postgres": False,

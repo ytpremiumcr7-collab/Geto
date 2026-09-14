@@ -6,7 +6,6 @@ from app.main import app
 
 @pytest.mark.asyncio
 async def test_liveness():
-
     transport = ASGITransport(app=app)
 
     async with AsyncClient(

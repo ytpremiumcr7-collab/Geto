@@ -39,7 +39,6 @@ class CopernicusSTACAdapter(SourceAdapter):
         datetime_range: str | None = None,
         limit: int = 20,
     ) -> Any:
-
         payload = {
             "collections": [settings.copernicus_collection],
             "limit": limit,
@@ -66,7 +65,6 @@ class CopernicusSTACAdapter(SourceAdapter):
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-
         for item in raw_data.get("features", []):
             item_id = item.get("id")
 

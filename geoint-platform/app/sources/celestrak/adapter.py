@@ -41,7 +41,6 @@ class CelesTrakAdapter(SourceAdapter):
         self,
         group: str | None = None,
     ) -> Any:
-
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(
                 settings.celestrak_base_url,
@@ -60,7 +59,6 @@ class CelesTrakAdapter(SourceAdapter):
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-
         for item in raw_data:
             norad_id = item.get("NORAD_CAT_ID")
 

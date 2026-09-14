@@ -111,7 +111,6 @@ class EntityRepository:
         properties: dict | None = None,
         tenant_id: str = "default",
     ) -> Entity:
-
         stmt = select(Entity).where(
             Entity.entity_id == entity_id,
             Entity.tenant_id == tenant_id,

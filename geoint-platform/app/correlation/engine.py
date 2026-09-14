@@ -6,7 +6,6 @@ class CorrelationEngine:
         self,
         observation: Observation,
     ) -> list[Event]:
-
         events = []
 
         if (

@@ -11,7 +11,6 @@ class OpenSkyTokenManager:
         self.expires_at: float = 0
 
     async def get_token(self) -> str:
-
         now = time.time()
 
         if self.token and now < self.expires_at - 60:

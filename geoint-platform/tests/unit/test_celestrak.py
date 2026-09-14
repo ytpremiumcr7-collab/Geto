@@ -7,7 +7,6 @@ from app.sources.celestrak.adapter import CelesTrakAdapter
 
 @pytest.mark.asyncio
 async def test_celestrak_normalization():
-
     adapter = CelesTrakAdapter()
 
     payload = [

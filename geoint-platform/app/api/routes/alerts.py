@@ -148,7 +148,6 @@ async def resolve_alert(
     return item
 
 
-
 @router.get("/{alert_id}/deliveries")
 async def list_deliveries(
     alert_id: UUID,

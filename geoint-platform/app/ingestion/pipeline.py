@@ -38,7 +38,6 @@ class IngestionPipeline:
         adapter: SourceAdapter,
         **kwargs,
     ) -> int:
-
         source_id = adapter.metadata.source_id
 
         started = __import__("time").perf_counter()

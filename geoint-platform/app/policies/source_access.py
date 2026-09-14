@@ -303,7 +303,6 @@ def filter_sources_for_principal(
 
 
 def assert_ingestion_allowed(source_id: str) -> None:
-
     """Ingestión worker: OpenSky solo si el job está marcado experimental y flag global."""
     from app.core.config import settings
 

@@ -40,7 +40,6 @@ class USGSEarthquakeAdapter(SourceAdapter):
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-
         for feature in raw_data.get("features", []):
             properties = feature.get("properties") or {}
             geometry = feature.get("geometry") or {}
