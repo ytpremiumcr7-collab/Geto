@@ -382,9 +382,7 @@ class TopographyService:
                 }
                 if clamped:
                     factors = list(quality.get("limiting_factors") or [])
-                    factors.append(
-                        f"sample_distance_m clamped to DEM GSD ({gsd} m)"
-                    )
+                    factors.append(f"sample_distance_m clamped to DEM GSD ({gsd} m)")
                     quality["limiting_factors"] = factors
             profile = [
                 ProfilePoint(

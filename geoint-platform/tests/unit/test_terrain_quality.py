@@ -43,7 +43,7 @@ def test_sample_must_not_exceed_gsd_policy():
 
 
 def test_vertical_datum_required_semantics():
-    from app.topography.models import DemAssetCreate, DemProvider, DemProductType
+    from app.topography.models import DemAssetCreate, DemProductType, DemProvider
 
     # valid
     DemAssetCreate(
