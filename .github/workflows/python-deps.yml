@@ -1,0 +1,57 @@
+# Verifies the hashed lock installs cleanly (supply-chain gate).
+name: Python deps (require-hashes)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "geoint-platform/requirements.lock.txt"
+      - "geoint-platform/requirements.in"
+      - "geoint-platform/pyproject.toml"
+      - "geoint-platform/scripts/generate_hashed_lock.py"
+      - ".github/workflows/python-deps.yml"
+  pull_request:
+    paths:
+      - "geoint-platform/requirements.lock.txt"
+      - "geoint-platform/requirements.in"
+      - "geoint-platform/pyproject.toml"
+      - ".github/workflows/python-deps.yml"
+  workflow_dispatch:
+
+env:
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  install-hashed-lock:
+    name: pip install --require-hashes
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: geoint-platform
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: geoint-platform/requirements.lock.txt
+
+      - name: Install system libs (native wheels may need headers)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libgdal-dev gdal-bin libpq-dev build-essential
+
+      - name: Install from hashed lock
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --no-deps -e .
+
+      - name: Smoke import
+        run: |
+          python -c "import app; from app.main import app as fastapi_app; print('ok', fastapi_app.title)"
+          ruff --version
+          mypy --version
