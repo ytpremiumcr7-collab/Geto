@@ -11,6 +11,8 @@ from typing import Any
 
 import numpy as np
 
+from app.topography.quality import build_los_quality, build_viewshed_quality
+
 try:
     import structlog
 
@@ -223,10 +225,16 @@ class TopographyEngine:
         observer_height_m: float = 1.7,
         target_height_m: float = 0.0,
         sample_distance_m: float = 5.0,
+        refraction_k: float | None = 1.333,
+        dem_resolution_m: float | None = None,
+        vertical_datum: str = "unknown",
     ) -> dict[str, Any]:
-        """Simple geometric LOS along densified profile (no refraction in MVP core).
+        """Geometric LOS with optional effective-Earth curvature (k-factor).
 
-        Returns visible flag + first obstruction distance if any.
+        refraction_k:
+          None → pure Euclidean ray (exploratory)
+          4/3  → standard radio/optical effective Earth (operational_support)
+        Quality block is always attached (uncertainty + certification disclaimer).
         """
         coords = [[observer_lon, observer_lat], [target_lon, target_lat]]
         pts = self.profile(raster_path, coords, sample_distance_m)
@@ -238,6 +246,14 @@ class TopographyEngine:
                 "obstruction_lat": None,
                 "profile": pts,
                 "note": "empty profile",
+                "algorithm": self.ALGORITHM_LOS,
+                "quality": build_los_quality(
+                    dem_resolution_m=dem_resolution_m,
+                    sample_distance_m=sample_distance_m,
+                    refraction_k=refraction_k,
+                    curvature_applied=False,
+                    vertical_datum=vertical_datum,
+                ).as_dict(),
             }
 
         obs_elev = pts[0].get("elevation_m")
@@ -250,19 +266,40 @@ class TopographyEngine:
                 "obstruction_lat": None,
                 "profile": pts,
                 "note": "missing elevation at endpoints",
+                "algorithm": self.ALGORITHM_LOS,
+                "quality": build_los_quality(
+                    dem_resolution_m=dem_resolution_m,
+                    sample_distance_m=sample_distance_m,
+                    refraction_k=refraction_k,
+                    curvature_applied=False,
+                    vertical_datum=vertical_datum,
+                ).as_dict(),
             }
 
         h0 = obs_elev + observer_height_m
         h1 = tgt_elev + target_height_m
         total = pts[-1]["distance_m"] or 1.0
+        # Effective Earth radius for curvature drop (ITU-style): R_eff = k * R_earth
+        r_earth = 6_371_000.0
+        k = refraction_k
+        curvature_applied = k is not None and k > 0
+
+        def _los_height(d: float) -> float:
+            # straight line in curved-Earth unfolded model: subtract Earth bulge
+            linear = h0 + (h1 - h0) * (d / total)
+            if not curvature_applied:
+                return linear
+            # bulge relative to chord approx: d*(total-d)/(2 R_eff)
+            r_eff = k * r_earth
+            bulge = (d * (total - d)) / (2.0 * r_eff)
+            return linear - bulge
 
         for p in pts[1:-1]:
             d = p["distance_m"]
             e = p.get("elevation_m")
             if e is None:
                 continue
-            # linear LOS height at distance d
-            los_h = h0 + (h1 - h0) * (d / total)
+            los_h = _los_height(d)
             if e > los_h:
                 return {
                     "visible": False,
@@ -273,6 +310,13 @@ class TopographyEngine:
                     "note": None,
                     "algorithm": self.ALGORITHM_LOS,
                     "assumptions": self.LOS_ASSUMPTIONS,
+                    "quality": build_los_quality(
+                        dem_resolution_m=dem_resolution_m,
+                        sample_distance_m=sample_distance_m,
+                        refraction_k=refraction_k,
+                        curvature_applied=curvature_applied,
+                        vertical_datum=vertical_datum,
+                    ).as_dict(),
                     "sample_distance_m": sample_distance_m,
                     "observer_height_m": observer_height_m,
                     "target_height_m": target_height_m,
@@ -287,6 +331,13 @@ class TopographyEngine:
             "note": None,
             "algorithm": self.ALGORITHM_LOS,
             "assumptions": self.LOS_ASSUMPTIONS,
+            "quality": build_los_quality(
+                dem_resolution_m=dem_resolution_m,
+                sample_distance_m=sample_distance_m,
+                refraction_k=refraction_k,
+                curvature_applied=curvature_applied,
+                vertical_datum=vertical_datum,
+            ).as_dict(),
             "sample_distance_m": sample_distance_m,
             "observer_height_m": observer_height_m,
             "target_height_m": target_height_m,
@@ -358,6 +409,11 @@ class TopographyEngine:
             "curvature_coeff": curvature_coeff,
             "observer_height_m": observer_height_m,
             "target_height_m": target_height_m,
+            "quality": build_viewshed_quality(
+                dem_resolution_m=None,
+                max_distance_m=max_distance_m,
+                curvature_coeff=curvature_coeff,
+            ).as_dict(),
         }
 
     # ── helpers ──────────────────────────────────────────────

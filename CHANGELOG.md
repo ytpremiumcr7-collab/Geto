@@ -2,6 +2,14 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.6.0] — 2026-09-14
+
+### Added
+- Alert notifier **HTTP health** `/health/live|ready` + Docker healthcheck + heartbeat file
+- ClickHouse **init schema** + `scripts/clickhouse_bootstrap.py` + compose profile `analytics`
+- OIDC preflight `scripts/oidc_check.py` + ops doc `OPS-OIDC-CLICKHOUSE-WORKER.md`
+- DEM/LOS **decision-support quality**: uncertainty, confidence, refraction k=4/3, certification disclaimer
+
 ## [2.5.0] — 2026-09-14
 
 ### Added
