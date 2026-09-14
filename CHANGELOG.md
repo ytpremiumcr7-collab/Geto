@@ -2,6 +2,13 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.9.1] — 2026-09-14
+
+### Security / supply-chain
+- `requirements.lock.txt` includes SHA256 hashes for every pinned artifact
+- CI installs with `pip install --require-hashes -r requirements.lock.txt` then `pip install --no-deps -e .`
+- `requirements.in` + `scripts/generate_hashed_lock.py` for reproducible regeneration
+
 ## [2.9.0] — 2026-09-14
 
 ### Fixed / hardened (remaining audit P1/P2)

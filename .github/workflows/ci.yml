@@ -23,13 +23,16 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           cache: "pip"
-          cache-dependency-path: geoint-platform/pyproject.toml
+          cache-dependency-path: |
+            geoint-platform/requirements.lock.txt
+            geoint-platform/pyproject.toml
 
       - name: Install lint tools
         working-directory: ./geoint-platform
         run: |
           python -m pip install --upgrade pip
-          pip install "ruff>=0.8,<1" "mypy>=1.13,<2"
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --no-deps -e .
 
       - name: Ruff check
         working-directory: ./geoint-platform
@@ -41,9 +44,7 @@ jobs:
 
       - name: MyPy type check
         working-directory: ./geoint-platform
-        run: |
-          pip install -e ".[dev]"
-          mypy app/ --ignore-missing-imports --no-strict-optional
+        run: mypy app/ --ignore-missing-imports --no-strict-optional
 
   backend-test:
     name: Backend - Tests
@@ -70,8 +71,8 @@ jobs:
         working-directory: ./geoint-platform
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.lock.txt
-          pip install -e ".[dev]"
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --no-deps -e .
 
       - name: Create .env for tests
         working-directory: ./geoint-platform
@@ -112,15 +113,15 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
 
       - name: Install security tools
+        working-directory: ./geoint-platform
         run: |
           python -m pip install --upgrade pip
-          pip install pip-audit bandit
+          pip install --require-hashes -r requirements.lock.txt
 
       - name: pip-audit
         working-directory: ./geoint-platform
         run: |
-          pip install -r requirements.lock.txt
-          pip-audit -r requirements.lock.txt || true  # advisory until --require-hashes lock
+          pip-audit -r requirements.lock.txt --disable-pip || true
         continue-on-error: true
 
       - name: Bandit SAST
@@ -265,8 +266,8 @@ jobs:
         working-directory: ./geoint-platform
         run: |
           python -m pip install -U pip
-          pip install -r requirements.lock.txt
-          pip install -e ".[dev]"
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --no-deps -e .
 
       - name: Alembic upgrade head
         working-directory: ./geoint-platform

@@ -31,6 +31,7 @@ cd geoint-platform
 cp .env.example .env          # set JWT_SECRET (≥32 chars); never use change-me in staging/prod
 docker compose up -d postgres redis nats minio
 export DATABASE_URL=postgresql+asyncpg://geoint:geoint@localhost:5432/geoint
+pip install --require-hashes -r requirements.lock.txt && pip install --no-deps -e .
 alembic upgrade head
 uvicorn app.main:app --reload --port 8000
 

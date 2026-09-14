@@ -14,6 +14,21 @@ Clients ──► FastAPI (REST + WebSocket)
 Workers: job_scheduler · source_worker · alert_notifier · outbox
 ```
 
+## Dependencies (hashed lock)
+
+```bash
+python -m pip install --upgrade pip
+pip install --require-hashes -r requirements.lock.txt
+pip install --no-deps -e .
+```
+
+Regenerate lock (maintainers):
+
+```bash
+# edit requirements.in (exact pins)
+python scripts/generate_hashed_lock.py
+```
+
 ## Run
 
 ```bash

@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "geoint-platform"
-version = "2.9.0"
+version = "2.9.1"
 description = "Modular geospatial intelligence ingestion and tracking platform"
 requires-python = ">=3.12"
 readme = "README.md"
