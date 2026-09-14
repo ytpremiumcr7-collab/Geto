@@ -1,0 +1,68 @@
+:root {
+  --bg: #070b10;
+  --bg-panel: #0c1219;
+  --bg-elevated: #121a24;
+  --border: #1e2a3a;
+  --border-glow: #1a3a4a;
+  --text: #e6edf5;
+  --text-muted: #8b9bb0;
+  --accent: #3dd6c6;
+  --accent-dim: #1a8a7e;
+  --warn: #f0b429;
+  --danger: #f07178;
+  --aircraft: #5b9cff;
+  --vessel: #3dd6c6;
+  --radar: #c792ea;
+  --sat: #ffcb6b;
+  --eq: #f07178;
+  --fire: #ff8b4d;
+  --font: "IBM Plex Sans", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font);
+}
+
+button,
+input,
+select {
+  font-family: inherit;
+}
+
+a {
+  color: var(--accent);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+.maplibregl-popup-content {
+  background: var(--bg-elevated) !important;
+  color: var(--text) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5) !important;
+  padding: 10px 12px !important;
+  font-size: 12px !important;
+}
+.maplibregl-popup-tip {
+  border-top-color: var(--bg-elevated) !important;
+}

@@ -1,0 +1,30 @@
+{
+  "opensky": {
+    "enabled": true,
+    "interval_seconds": 30,
+    "requires_credentials": true
+  },
+  "celestrak": {
+    "enabled": true,
+    "interval_seconds": 7200,
+    "group": "STATIONS"
+  },
+  "usgs_earthquake": {
+    "enabled": true,
+    "interval_seconds": 60
+  },
+  "nasa_firms": {
+    "enabled": true,
+    "interval_seconds": 600,
+    "requires_credentials": true
+  },
+  "aviation_weather": {
+    "enabled": true,
+    "interval_seconds": 300
+  },
+  "copernicus": {
+    "enabled": true,
+    "interval_seconds": 3600,
+    "collection": "sentinel-2-l2a"
+  }
+}
