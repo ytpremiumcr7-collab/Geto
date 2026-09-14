@@ -58,3 +58,23 @@ export function getUser(): AuthUser | null {
     return null;
   }
 }
+
+
+export function setToken(token: string) {
+  migrateFromLocalStorage();
+  store.setItem(TOKEN_KEY, token);
+}
+
+export function setUser(user: { user_id?: string; tenant_id?: string; roles?: string[] }) {
+  migrateFromLocalStorage();
+  const prev = getUser();
+  const merged = {
+    access_token: prev?.access_token || getToken() || "",
+    token_type: prev?.token_type || "bearer",
+    expires_in: prev?.expires_in || 3600,
+    tenant_id: user.tenant_id || prev?.tenant_id || "default",
+    roles: user.roles || prev?.roles || [],
+    user_id: user.user_id,
+  };
+  store.setItem(USER_KEY, JSON.stringify(merged));
+}

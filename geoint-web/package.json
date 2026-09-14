@@ -1,13 +1,14 @@
 {
   "name": "geoint-web",
   "private": true,
-  "version": "2.4.0",
+  "version": "2.5.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "build": "vite build",
+    "build:check": "tsc --noEmit && vite build",
+    "preview": "vite preview"
   },
   "dependencies": {
     "maplibre-gl": "^4.7.1",

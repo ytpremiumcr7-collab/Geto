@@ -148,7 +148,7 @@ jobs:
 
       - name: Type check
         working-directory: ./geoint-web
-        run: npx tsc --noEmit || npm run typecheck || true
+        run: npm run typecheck || true
 
       - name: Build
         working-directory: ./geoint-web
@@ -183,7 +183,7 @@ jobs:
   docker-build:
     name: Docker - Build Images
     runs-on: ubuntu-latest
-    needs: [backend-lint, frontend-build]
+    needs: [backend-lint, backend-test, e2e-smoke, frontend-build]
     steps:
       - uses: actions/checkout@v4
 
@@ -275,6 +275,10 @@ jobs:
       - name: Offline alert notifier verify
         working-directory: ./geoint-platform
         run: python scripts/verify_alert_notifier_flow.py
+
+      - name: Product E2E (me → alert → delivery)
+        working-directory: ./geoint-platform
+        run: python scripts/e2e_ci_product_flow.py
 
       - name: API smoke (lifespan + health)
         working-directory: ./geoint-platform

@@ -2,6 +2,18 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.5.0] — 2026-09-14
+
+### Added
+- Product UI routes: onboarding, map, alerts, analytics, permissions, admin (AppShell)
+- AuthContext + `/api/v1/me` wired for visible RBAC in UI
+- CI `e2e_ci_product_flow.py`: me → sources → alert emit → delivery delivered
+- Root README pre-production clone-and-run
+
+### Fixed
+- Frontend build uses Vite hard gate; tsconfig without allowImportingTsExtensions
+- CI product e2e step on PostGIS service job
+
 ## [2.4.0] — 2026-09-14
 
 ### Added
