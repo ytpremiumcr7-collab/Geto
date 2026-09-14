@@ -5,10 +5,9 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_principal
+from app.auth.dependencies import get_current_principal, get_tenant_db
 from app.auth.models import Principal
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 from app.topography.models import (
     DemAssetCreate,
     DemProvider,
@@ -36,9 +35,8 @@ async def providers(principal: Principal = Depends(get_current_principal)):
 @router.get("/dem")
 async def list_dem(
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     assets = await svc.list_dems(principal.tenant_id)
     return {"dem_assets": assets, "tenant_id": principal.tenant_id}
@@ -48,9 +46,8 @@ async def list_dem(
 async def register_dem(
     body: DemAssetCreate,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
         asset = await svc.register_dem(principal.tenant_id, body)
@@ -66,9 +63,8 @@ async def elevation(
     dem_id: str | None = None,
     preferred_provider: DemProvider | None = None,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     return await svc.elevation(principal.tenant_id, lat, lon, dem_id, preferred_provider)
 
@@ -77,9 +73,8 @@ async def elevation(
 async def profile(
     body: ProfileRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     return await svc.profile(
         principal.tenant_id,
@@ -93,9 +88,8 @@ async def profile(
 async def slope(
     body: RasterOpRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
         return await svc.raster_op(principal.tenant_id, body.dem_id, "slope", body.bbox)
@@ -107,9 +101,8 @@ async def slope(
 async def aspect(
     body: RasterOpRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
         return await svc.raster_op(principal.tenant_id, body.dem_id, "aspect", body.bbox)
@@ -121,9 +114,8 @@ async def aspect(
 async def hillshade(
     body: RasterOpRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
         return await svc.raster_op(principal.tenant_id, body.dem_id, "hillshade", body.bbox)
@@ -135,9 +127,8 @@ async def hillshade(
 async def line_of_sight(
     body: LosRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ) -> LosResponse:
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     return await svc.line_of_sight(
         principal.tenant_id,
@@ -157,9 +148,8 @@ async def line_of_sight(
 async def viewshed(
     body: ViewshedRequest,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     try:
         return await svc.viewshed(
@@ -185,10 +175,9 @@ async def slope_preview(
     east: float | None = None,
     north: float | None = None,
     principal: Principal = Depends(get_current_principal),
-    session: AsyncSession = Depends(get_db),
+    session: AsyncSession = Depends(get_tenant_db),
 ):
     """PNG slope overlay for MapLibre image source. Bounds in response headers."""
-    await set_tenant(session, principal.tenant_id)
     svc = TopographyService(session)
     bbox = None
     if None not in (west, south, east, north):

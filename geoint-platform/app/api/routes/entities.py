@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException
 from geoalchemy2.shape import to_shape
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_principal
+from app.auth.dependencies import get_current_principal, get_tenant_db
 from app.auth.models import Principal
 from app.db.repositories import EntityRepository, ObservationRepository
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 
 router = APIRouter(
     prefix="/api/v1/entities",
@@ -17,10 +16,9 @@ router = APIRouter(
 @router.get("/{entity_id}")
 async def get_entity(
     entity_id: str,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     repository = EntityRepository(db)
     entity = await repository.get(entity_id)
     if entity is None:
@@ -39,10 +37,9 @@ async def get_entity(
 async def get_track(
     entity_id: str,
     limit: int = 100,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     repository = ObservationRepository(db)
     rows = await repository.list(entity_id=entity_id, limit=limit)
     track = []

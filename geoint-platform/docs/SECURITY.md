@@ -41,3 +41,18 @@ Without an IdP, for staging lab only:
 python scripts/dev_jwks_server.py --port 9090
 # JWT_JWKS_URL=http://127.0.0.1:9090/jwks.json
 ```
+
+
+## API keys
+
+- Staging/production: **only** `API_KEY_HASHES` (plaintext `API_KEYS` rejected at bootstrap)
+- Development may still use plaintext for convenience
+
+## Trusted hosts
+
+- Production requires `TRUSTED_HOSTS` (comma-separated)
+- Metrics (`/metrics`) require auth **and** role `admin`, `metrics`, or `geoint.metrics.read` unless `METRICS_PUBLIC=true`
+
+## MinIO
+
+- Set `MINIO_CREATE_BUCKET=false` in staging/prod; provision buckets out-of-band

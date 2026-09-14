@@ -45,6 +45,24 @@ class OutboxDispatcher:
             messages = await self.repo.claim(session, self.batch_size)
             for message in messages:
                 try:
+                    if message.subject == "geoint.analytics.observations":
+                        from app.analytics.clickhouse import ClickHouseSink
+
+                        payload = message.payload or {}
+                        rows = payload.get("rows") or []
+                        tenant_id = payload.get("tenant_id") or "default"
+                        if rows:
+                            await ClickHouseSink().write_observations(
+                                rows, tenant_id=tenant_id
+                            )
+                        await self.repo.mark_published(session, message)
+                        log.info(
+                            "clickhouse_outbox_written",
+                            message_id=str(message.id),
+                            rows=len(rows),
+                        )
+                        continue
+
                     assert self.js.js is not None
                     await self.js.js.publish(
                         message.subject,

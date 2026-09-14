@@ -214,6 +214,14 @@ class SourceDispatcher:
             },
             tenant_id=tenant_id,
         )
+        # Durable analytics intent in same TX as observations (outbox)
+        if getattr(settings, "clickhouse_enabled", False) and ch_rows:
+            await outbox.enqueue(
+                session,
+                subject="geoint.analytics.observations",
+                payload={"tenant_id": tenant_id, "source_id": source_id, "rows": ch_rows},
+                tenant_id=tenant_id,
+            )
         await session.commit()
         log.info(
             "dispatch_ok",
@@ -221,11 +229,12 @@ class SourceDispatcher:
             inserted=inserted,
             job_type=job_type,
         )
+        # Best-effort immediate write; outbox dispatcher retries if this fails
         if getattr(settings, "clickhouse_enabled", False) and ch_rows:
             try:
                 await ClickHouseSink().write_observations(ch_rows, tenant_id=tenant_id)
             except Exception:
-                log.exception("clickhouse_write_failed")
+                log.exception("clickhouse_write_failed_will_retry_via_outbox")
         return inserted
 
     async def _insert_observation(

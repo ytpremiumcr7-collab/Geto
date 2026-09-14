@@ -27,7 +27,8 @@ class TokenResponse(BaseModel):
 @router.post("/token", response_model=TokenResponse)
 async def issue_token(request: Request, body: TokenRequest):
     """Solo si AUTH_BOOTSTRAP_SECRET coincide o app_env=development."""
-    client = request.client.host if request.client else "unknown"
+    from app.middleware.rate_limit_mw import _client_ip
+    client = _client_ip(request)
     if not await check_rate_limit(f"auth:{client}", limit=20, window_seconds=60):
         raise HTTPException(status_code=429, detail="Rate limit exceeded")
     if settings.app_env not in ("development", "dev", "test"):

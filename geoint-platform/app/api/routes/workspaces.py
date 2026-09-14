@@ -6,10 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_principal, require_roles
+from app.auth.dependencies import get_current_principal, get_tenant_db, require_roles
 from app.auth.models import Principal
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 from app.workspaces.service import WorkspaceService
 
 router = APIRouter(prefix="/api/v1/workspaces", tags=["workspaces"])
@@ -49,10 +48,9 @@ class LayerCreate(BaseModel):
 
 @router.get("")
 async def list_workspaces(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     items = await svc.list_workspaces(db, principal.tenant_id)
     return {"workspaces": items, "tenant_id": principal.tenant_id}
 
@@ -60,10 +58,9 @@ async def list_workspaces(
 @router.post("")
 async def create_workspace(
     body: WorkspaceCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     item = await svc.create(
         db,
         tenant_id=principal.tenant_id,
@@ -84,10 +81,9 @@ async def create_workspace(
 async def update_workspace(
     workspace_id: UUID,
     body: WorkspaceUpdate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     item = await svc.update(
         db, principal.tenant_id, workspace_id, **body.model_dump(exclude_unset=True)
     )
@@ -99,10 +95,9 @@ async def update_workspace(
 @router.delete("/{workspace_id}")
 async def delete_workspace(
     workspace_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin")),
 ):
-    await set_tenant(db, principal.tenant_id)
     ok = await svc.delete(db, principal.tenant_id, workspace_id)
     if not ok:
         raise HTTPException(status_code=404, detail="Workspace not found")
@@ -112,10 +107,9 @@ async def delete_workspace(
 @router.get("/{workspace_id}/layers")
 async def list_layers(
     workspace_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     items = await svc.list_layers(db, principal.tenant_id, workspace_id)
     return {"layers": items}
 
@@ -124,10 +118,9 @@ async def list_layers(
 async def add_layer(
     workspace_id: UUID,
     body: LayerCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     item = await svc.add_layer(
         db,
         tenant_id=principal.tenant_id,

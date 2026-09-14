@@ -24,7 +24,14 @@ class ObjectStore:
 
     def ensure_bucket(self, bucket: str | None = None) -> str:
         b = bucket or settings.minio_bucket_raw
-        if not self.client.bucket_exists(b):
+        exists = self.client.bucket_exists(b)
+        if not exists:
+            allow = getattr(settings, "minio_create_bucket", False)
+            if not allow:
+                raise RuntimeError(
+                    f"MinIO bucket {b!r} does not exist and MINIO_CREATE_BUCKET is false "
+                    "(provision buckets out-of-band in staging/production)"
+                )
             self.client.make_bucket(b)
         return b
 

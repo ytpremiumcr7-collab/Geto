@@ -64,7 +64,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="2.8.0",
+    version="2.9.0",
     lifespan=lifespan,
 )
 
@@ -127,14 +127,23 @@ async def metrics(request: Request):
             return Response(status_code=401, content=b"Unauthorized")
         try:
             from app.auth.jwt import JWTService
+            from app.auth.dependencies import _api_key_principal
 
+            principal = None
             if auth.lower().startswith("bearer "):
-                JWTService().decode(auth.split(" ", 1)[1])
+                principal = JWTService().decode(auth.split(" ", 1)[1])
             else:
-                from app.auth.dependencies import _api_key_principal
-
-                if not _api_key_principal(auth):
-                    return Response(status_code=401, content=b"Unauthorized")
+                principal = _api_key_principal(auth)
+            if principal is None:
+                return Response(status_code=401, content=b"Unauthorized")
+            # Require admin or explicit metrics role
+            roles = getattr(principal, "roles", frozenset()) or frozenset()
+            if not (
+                "admin" in roles
+                or "metrics" in roles
+                or "geoint.metrics.read" in roles
+            ):
+                return Response(status_code=403, content=b"Forbidden")
         except Exception:
             return Response(status_code=401, content=b"Unauthorized")
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

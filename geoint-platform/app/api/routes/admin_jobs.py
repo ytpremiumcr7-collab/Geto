@@ -9,10 +9,9 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import require_roles
+from app.auth.dependencies import get_tenant_db, require_roles
 from app.auth.models import Principal
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 from app.jobs.models import SourceJob
 
 router = APIRouter(prefix="/api/v1/admin/jobs", tags=["admin-jobs"])
@@ -20,10 +19,9 @@ router = APIRouter(prefix="/api/v1/admin/jobs", tags=["admin-jobs"])
 
 @router.get("")
 async def list_jobs(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin")),
 ):
-    await set_tenant(db, principal.tenant_id)
     result = await db.execute(
         select(SourceJob)
         .where(SourceJob.tenant_id == principal.tenant_id)
@@ -59,10 +57,9 @@ class JobPatch(BaseModel):
 async def patch_job(
     job_id: UUID,
     body: JobPatch,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin")),
 ):
-    await set_tenant(db, principal.tenant_id)
     job = await db.get(SourceJob, job_id)
     if not job or job.tenant_id != principal.tenant_id:
         raise HTTPException(status_code=404, detail="Job not found")

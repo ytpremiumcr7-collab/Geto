@@ -2,6 +2,17 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.9.0] — 2026-09-14
+
+### Fixed / hardened (remaining audit P1/P2)
+- `get_tenant_db` dependency; DB routes no longer rely on manual `set_tenant`
+- ClickHouse: outbox `geoint.analytics.observations` + dispatcher write path (durable retry)
+- Plaintext `API_KEYS` forbidden in staging/prod; `TRUSTED_HOSTS` required in production
+- Geofence geometry validation (validity, size, bounds, make_valid)
+- `/metrics` requires admin|metrics role; WS query-token rejected in staging/prod
+- MinIO bucket create gated by `MINIO_CREATE_BUCKET`; rate limit uses XFF + identity suffix
+- Frontend: `clearAuth()` on `/me` failure (no stale semi-auth session)
+
 ## [2.8.0] — 2026-09-14
 
 ### Fixed (audit P1 harden)

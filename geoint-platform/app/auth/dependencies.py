@@ -11,6 +11,9 @@ from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBea
 
 from app.auth.jwt import JWTService
 from app.auth.models import Principal
+from app.db.session import get_db
+from app.db.tenant import set_tenant
+from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 
 log = logging.getLogger(__name__)
@@ -77,14 +80,16 @@ def _api_key_principal(raw_key: str) -> Principal | None:
         if p:
             return p
 
-    configured = settings.api_keys or ""
-    for entry in configured.split(";"):
-        entry = entry.strip()
-        if not entry:
-            continue
-        p = _parse_principal_from_entry(entry, raw_key, hashed=False)
-        if p:
-            return p
+    # Plaintext API_KEYS only in development
+    if getattr(settings, "app_env", "development") not in ("production", "prod", "staging"):
+        configured = settings.api_keys or ""
+        for entry in configured.split(";"):
+            entry = entry.strip()
+            if not entry:
+                continue
+            p = _parse_principal_from_entry(entry, raw_key, hashed=False)
+            if p:
+                return p
     return None
 
 
@@ -146,3 +151,21 @@ def require_roles(*roles: str):
         )
 
     return _checker
+
+
+
+async def get_tenant_db(
+    session: AsyncSession = Depends(get_db),
+    principal: Principal = Depends(get_current_principal),
+) -> AsyncSession:
+    """Session with RLS tenant already bound — prefer over bare get_db + set_tenant."""
+    await set_tenant(session, principal.tenant_id)
+    return session
+
+
+async def get_system_db(
+    session: AsyncSession = Depends(get_db),
+) -> AsyncSession:
+    """Worker/system path: app.tenant_id=__system__. Not for user requests."""
+    await set_tenant(session, "__system__")
+    return session

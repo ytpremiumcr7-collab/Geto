@@ -30,10 +30,22 @@ def _token_from_header(websocket: WebSocket) -> str | None:
 
 @router.websocket("/ws/events")
 async def events_websocket(websocket: WebSocket):
-    token = _token_from_header(websocket) or websocket.query_params.get("token")
-    principal = None
+    token = _token_from_header(websocket)
+    query_token = websocket.query_params.get("token")
     client = websocket.client.host if websocket.client else "unknown"
     auth_mode = "none"
+    principal = None
+
+    if query_token and not token:
+        from app.core.config import settings as _settings
+
+        if getattr(_settings, "app_env", "development") in ("production", "prod", "staging"):
+            log.warning("ws_query_token_rejected", client=client, env=_settings.app_env)
+            await websocket.close(code=4401)
+            return
+        log.warning("ws_query_token_deprecated", client=client)
+        token = query_token
+        auth_mode = "query_deprecated"
 
     if token:
         auth_mode = "header_or_query"

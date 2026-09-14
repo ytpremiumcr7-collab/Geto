@@ -9,10 +9,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.alerts.delivery import DeliveryService
 from app.alerts.service import AlertService
-from app.auth.dependencies import get_current_principal, require_roles
+from app.auth.dependencies import get_current_principal, get_tenant_db, require_roles
 from app.auth.models import Principal
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 svc = AlertService()
@@ -40,20 +39,18 @@ class SilenceBody(BaseModel):
 
 @router.get("/channels")
 async def list_channels(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     return {"channels": await svc.list_channels(db, principal.tenant_id)}
 
 
 @router.post("/channels")
 async def create_channel(
     body: ChannelCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     if body.channel_type == "webhook":
         from app.alerts.ssrf import UnsafeWebhookURL, validate_webhook_url
 
@@ -78,20 +75,18 @@ async def create_channel(
 @router.get("/rules")
 async def list_rules(
     geofence_id: UUID | None = None,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     return {"rules": await svc.list_rules(db, principal.tenant_id, geofence_id)}
 
 
 @router.post("/rules")
 async def create_rule(
     body: RuleCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     # Geofence must belong to the same tenant (integrity, not only RLS)
     from sqlalchemy import select
     from app.geofencing.models import Geofence
@@ -123,10 +118,9 @@ async def create_rule(
 async def silence_rule(
     rule_id: UUID,
     body: SilenceBody,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     until = datetime.now(UTC) + timedelta(minutes=body.minutes)
     item = await svc.silence_rule(db, principal.tenant_id, rule_id, until)
     if not item:
@@ -138,10 +132,9 @@ async def silence_rule(
 async def list_alerts(
     status: str | None = Query("open"),
     limit: int = Query(50, ge=1, le=200),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     return {
         "alerts": await svc.list_alerts(db, principal.tenant_id, status=status, limit=limit),
         "tenant_id": principal.tenant_id,
@@ -151,10 +144,9 @@ async def list_alerts(
 @router.post("/{alert_id}/ack")
 async def ack_alert(
     alert_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     item = await svc.ack_alert(db, principal.tenant_id, alert_id, principal.user_id)
     if not item:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -164,10 +156,9 @@ async def ack_alert(
 @router.post("/{alert_id}/resolve")
 async def resolve_alert(
     alert_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
     item = await svc.resolve_alert(db, principal.tenant_id, alert_id)
     if not item:
         raise HTTPException(status_code=404, detail="Alert not found")
@@ -177,9 +168,8 @@ async def resolve_alert(
 @router.get("/{alert_id}/deliveries")
 async def list_deliveries(
     alert_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     items = await DeliveryService().list_for_alert(db, principal.tenant_id, alert_id)
     return {"deliveries": items, "alert_id": str(alert_id)}

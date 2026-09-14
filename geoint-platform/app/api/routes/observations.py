@@ -3,11 +3,10 @@ from datetime import datetime
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_principal
+from app.auth.dependencies import get_current_principal, get_tenant_db
 from app.auth.models import Principal
 from app.db.repositories import ObservationRepository
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 from app.policies.source_access import assert_can_read_source
 
 router = APIRouter(
@@ -23,12 +22,11 @@ async def list_observations(
     since: datetime | None = Query(None, description="ISO8601 inclusive start"),
     until: datetime | None = Query(None, description="ISO8601 inclusive end"),
     limit: int = Query(100, ge=1, le=1000),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
     if source_id:
         assert_can_read_source(principal, source_id)
-    await set_tenant(db, principal.tenant_id)
     repository = ObservationRepository(db)
     rows = await repository.list(
         entity_id=entity_id,

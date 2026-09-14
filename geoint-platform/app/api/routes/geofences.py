@@ -9,10 +9,9 @@ from shapely.geometry import MultiPolygon, shape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import get_current_principal, require_roles
+from app.auth.dependencies import get_current_principal, get_tenant_db, require_roles
 from app.auth.models import Principal
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 from app.geofencing.models import Geofence
 
 router = APIRouter(prefix="/api/v1/geofences", tags=["geofences"])
@@ -29,10 +28,9 @@ class GeofenceCreate(BaseModel):
 
 @router.get("")
 async def list_geofences(
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    await set_tenant(db, principal.tenant_id)
     result = await db.execute(
         select(Geofence).where(Geofence.tenant_id == principal.tenant_id).order_by(Geofence.name)
     )
@@ -62,15 +60,18 @@ async def list_geofences(
 @router.post("")
 async def create_geofence(
     body: GeofenceCreate,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    await set_tenant(db, principal.tenant_id)
-    geom = shape(body.geometry)
-    if geom.geom_type == "Polygon":
-        geom = MultiPolygon([geom])
-    if geom.geom_type != "MultiPolygon":
-        raise HTTPException(status_code=400, detail="geometry must be Polygon or MultiPolygon")
+    from app.geofencing.geometry_validate import (
+        InvalidGeofenceGeometry,
+        validate_and_normalize_geofence_geometry,
+    )
+
+    try:
+        geom = validate_and_normalize_geofence_geometry(body.geometry)
+    except InvalidGeofenceGeometry as e:
+        raise HTTPException(status_code=400, detail=str(e)) from e
 
     fence = Geofence(
         id=uuid4(),

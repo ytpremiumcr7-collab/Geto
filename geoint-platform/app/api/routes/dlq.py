@@ -7,11 +7,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth.dependencies import require_roles
+from app.auth.dependencies import get_tenant_db, require_roles
 from app.auth.models import Principal
 from app.db.models_dlq import DlqMessage
-from app.db.session import get_db
-from app.db.tenant import set_tenant
+from app.db.session import get_db  # noqa: F401 — legacy
 from app.messaging.jetstream import JetStreamClient
 from app.messaging.subjects import JOBS_PREFIX
 
@@ -22,10 +21,9 @@ router = APIRouter(prefix="/api/v1/admin/dlq", tags=["dlq"])
 async def list_dlq(
     status: str = Query("open"),
     limit: int = Query(50, ge=1, le=500),
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin")),
 ):
-    await set_tenant(db, principal.tenant_id)
     stmt = (
         select(DlqMessage)
         .where(
@@ -56,10 +54,9 @@ async def list_dlq(
 @router.post("/{message_id}/requeue")
 async def requeue_dlq(
     message_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin")),
 ):
-    await set_tenant(db, principal.tenant_id)
     msg = await db.get(DlqMessage, message_id)
     if not msg or msg.tenant_id != principal.tenant_id:
         raise HTTPException(status_code=404, detail="DLQ message not found")
@@ -99,10 +96,9 @@ async def requeue_dlq(
 @router.post("/{message_id}/resolve")
 async def resolve_dlq(
     message_id: UUID,
-    db: AsyncSession = Depends(get_db),
+    db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin")),
 ):
-    await set_tenant(db, principal.tenant_id)
     msg = await db.get(DlqMessage, message_id)
     if not msg or msg.tenant_id != principal.tenant_id:
         raise HTTPException(status_code=404, detail="DLQ message not found")

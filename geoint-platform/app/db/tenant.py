@@ -25,3 +25,6 @@ async def get_tenant_session(session: AsyncSession, tenant_id: str) -> AsyncSess
     """Bind RLS tenant on an existing session."""
     await set_tenant(session, tenant_id)
     return session
+
+
+# FastAPI dependency lives in app.auth.dependencies (get_tenant_db) to avoid circular imports.

@@ -34,6 +34,7 @@ class Settings(BaseSettings):
     minio_bucket_raw: str = "geoint-raw"
     dem_allowed_key_prefixes: str = "dem/,derived/"  # comma-separated
     minio_secure: bool = False
+    minio_create_bucket: bool = True  # False in prod: provision externally
 
     opensky_client_id: str | None = None
     opensky_client_secret: str | None = None
