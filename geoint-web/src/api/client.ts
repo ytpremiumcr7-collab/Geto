@@ -316,3 +316,98 @@ export async function fetchSlopePreview(
     },
   };
 }
+
+// --- Product P1: workspaces / alerts / admin ---
+
+export type Workspace = {
+  id: string;
+  name: string;
+  description?: string | null;
+  is_default: boolean;
+  aoi_geojson?: object | null;
+  map_center_lon?: number | null;
+  map_center_lat?: number | null;
+  map_zoom?: number | null;
+};
+
+export type SavedLayer = {
+  id: string;
+  workspace_id: string;
+  name: string;
+  layer_type: string;
+  config: Record<string, unknown>;
+  visible: boolean;
+};
+
+export type GeofenceAlert = {
+  id: string;
+  geofence_id: string;
+  entity_id: string;
+  event_type: string;
+  severity: string;
+  status: string;
+  occurred_at: string | null;
+  acked_by?: string | null;
+};
+
+export type AdminJob = {
+  id: string;
+  name: string;
+  source_id: string;
+  status: string;
+  enabled: boolean;
+  interval_seconds: number;
+  last_error?: string | null;
+  last_success_at?: string | null;
+};
+
+export type DlqItem = {
+  id: string;
+  source_id: string;
+  error: string;
+  status: string;
+  created_at: string;
+};
+
+export async function fetchWorkspaces() {
+  return api<{ workspaces: Workspace[] }>("/api/v1/workspaces");
+}
+
+export async function createWorkspace(body: { name: string; is_default?: boolean; aoi_geojson?: object }) {
+  return api<Workspace>("/api/v1/workspaces", { method: "POST", body: JSON.stringify(body) });
+}
+
+export async function fetchWorkspaceLayers(workspaceId: string) {
+  return api<{ layers: SavedLayer[] }>(`/api/v1/workspaces/${workspaceId}/layers`);
+}
+
+export async function fetchAlerts(status = "open") {
+  return api<{ alerts: GeofenceAlert[] }>(`/api/v1/alerts?status=${encodeURIComponent(status)}`);
+}
+
+export async function ackAlert(id: string) {
+  return api<GeofenceAlert>(`/api/v1/alerts/${id}/ack`, { method: "POST" });
+}
+
+export async function resolveAlert(id: string) {
+  return api<GeofenceAlert>(`/api/v1/alerts/${id}/resolve`, { method: "POST" });
+}
+
+export async function fetchAdminJobs() {
+  return api<{ jobs: AdminJob[] }>("/api/v1/admin/jobs");
+}
+
+export async function patchAdminJob(id: string, body: { enabled?: boolean; interval_seconds?: number }) {
+  return api<{ id: string; enabled: boolean }>(`/api/v1/admin/jobs/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(body),
+  });
+}
+
+export async function fetchDlq(status = "open") {
+  return api<{ items: DlqItem[] }>(`/api/v1/admin/dlq?status=${encodeURIComponent(status)}`);
+}
+
+export async function requeueDlq(id: string) {
+  return api<{ ok?: boolean }>(`/api/v1/admin/dlq/${id}/requeue`, { method: "POST" });
+}

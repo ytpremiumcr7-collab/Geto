@@ -58,3 +58,17 @@ async def readiness():
     )
 
     return result
+
+
+@router.get("/health/version")
+async def version():
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[3]
+    ver = "2.3.0"
+    vf = root.parent / "VERSION"
+    if not vf.exists():
+        vf = root / "VERSION"
+    if vf.exists():
+        ver = vf.read_text().strip() or ver
+    return {"version": ver, "product": "geoint-platform"}

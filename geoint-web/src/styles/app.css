@@ -678,3 +678,17 @@ button.ghost.active-draw {
 .small {
   font-size: 11px;
 }
+
+/* Product P1 */
+.admin-page { padding: 1rem 1.25rem; max-width: 1200px; margin: 0 auto; }
+.data-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+.data-table th, .data-table td { border-bottom: 1px solid #2a3544; padding: 0.4rem 0.5rem; text-align: left; }
+.alert-list { list-style: none; padding: 0; margin: 0; }
+.alert-list li { display: flex; justify-content: space-between; gap: 0.75rem; padding: 0.5rem 0; border-bottom: 1px solid #243041; }
+.alert.sev-high, .alert.sev-critical { border-left: 3px solid #ff8b4d; padding-left: 0.5rem; }
+.simple-list { list-style: none; padding: 0; }
+.simple-list button.active { font-weight: 700; }
+.row.gap { display: flex; gap: 0.5rem; align-items: center; }
+.row.between { display: flex; justify-content: space-between; align-items: center; }
+.muted { opacity: 0.65; font-size: 0.85em; }
+.error { color: #f07178; }

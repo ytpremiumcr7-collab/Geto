@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   createGeofence,
   fetchGeofences,
@@ -21,6 +21,8 @@ import { TimeFilter } from "@/components/TimeFilter";
 import { GeofencesPanel } from "@/components/GeofencesPanel";
 import { useLiveEvents } from "@/hooks/useLiveEvents";
 import { TopographyPanel, type TopoMode } from "@/components/TopographyPanel";
+import { WorkspacePanel } from "@/components/WorkspacePanel";
+import { AlertsPanel } from "@/components/AlertsPanel";
 import type { LosResult, ProfilePoint } from "@/api/client";
 
 export function Dashboard() {
@@ -140,7 +142,7 @@ export function Dashboard() {
   }
 
   function logout() {
-    clearAuth();
+    clearAuth() /* nav */;
     nav("/login");
   }
 
@@ -179,7 +181,7 @@ export function Dashboard() {
 
   return (
     <div className="shell">
-      <header className="topbar">
+      <header data-product="geoint" className="topbar">
         <div className="brand">
           <div className="logo-mark sm" />
           <span>GEOINT</span>
@@ -211,6 +213,9 @@ export function Dashboard() {
           </button>
           <span className="mono">{user?.tenant_id || "—"}</span>
           <span className="muted">{(user?.roles || []).join(", ")}</span>
+          <Link to="/admin" className="ghost">
+            Admin
+          </Link>
           <button type="button" className="ghost" onClick={logout}>
             Salir
           </button>
@@ -219,6 +224,8 @@ export function Dashboard() {
 
       <div className="workspace">
         <aside className="left">
+          <WorkspacePanel />
+          <AlertsPanel />
           <SourcesPanel
             sources={sources}
             selected={selected}

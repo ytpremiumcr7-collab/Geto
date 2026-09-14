@@ -2,6 +2,7 @@ import { Navigate, Route, Routes } from "react-router-dom";
 import { getToken } from "@/lib/auth";
 import { Login } from "@/pages/Login";
 import { Dashboard } from "@/pages/Dashboard";
+import { Admin } from "@/pages/Admin";
 import "./styles/app.css";
 
 function Private({ children }: { children: React.ReactNode }) {
@@ -18,6 +19,14 @@ export default function App() {
         element={
           <Private>
             <Dashboard />
+          </Private>
+        }
+      />
+      <Route
+        path="/admin"
+        element={
+          <Private>
+            <Admin />
           </Private>
         }
       />
