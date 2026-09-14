@@ -2,6 +2,15 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.4.0] — 2026-09-14
+
+### Added
+- LOS/Viewshed **precision docs** (`docs/TOPOGRAPHY-LOS-VIEWSHED.md`) + API metadata (`algorithm`, `assumptions`)
+- **ClickHouse product API**: `/api/v1/analytics/templates|query|status` (allowlisted templates)
+- **RBAC fino al cliente**: `Principal.permissions()`, `/api/v1/me`, `/api/v1/me/permissions`
+- Frontend: design **tokens**, skip-link a11y, `lang`, i18n es/en (`src/i18n`)
+- CI **E2E smoke** with PostGIS service: alembic upgrade + ASGI health/me/analytics
+
 ## [2.3.1] — 2026-09-14
 
 ### Added — alert notifiers

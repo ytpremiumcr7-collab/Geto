@@ -50,6 +50,20 @@ def _require_gdal():
 class TopographyEngine:
     """Pure processing — no I/O beyond reading raster paths."""
 
+    # Product metadata for API consumers (precision / limits)
+    ALGORITHM_LOS = "profile-linear-occlusion-v1"
+    ALGORITHM_VIEWSHED = "gdal-ViewshedGenerate-Wang-GVM_Edge"
+    LOS_ASSUMPTIONS = (
+        "Flat ray between observer and target heights above DEM; "
+        "no atmospheric refraction; no vegetation/building clutter; "
+        "sample spacing may miss narrow peaks."
+    )
+    VIEWSHED_ASSUMPTIONS = (
+        "GDAL Wang viewshed; curvature_coeff models refraction approx; "
+        "geographic CRS uses crude m→degree conversion; DEM surface only."
+    )
+
+
     def sample_elevation(self, raster_path: str, lon: float, lat: float) -> float | None:
         rasterio, rowcol, xy, rio_transform = _require_rasterio()
         with rasterio.open(raster_path) as ds:
@@ -258,6 +272,11 @@ class TopographyEngine:
                     "obstruction_lat": p["lat"],
                     "profile": pts,
                     "note": None,
+                    "algorithm": self.ALGORITHM_LOS,
+                    "assumptions": self.LOS_ASSUMPTIONS,
+                    "sample_distance_m": sample_distance_m,
+                    "observer_height_m": observer_height_m,
+                    "target_height_m": target_height_m,
                 }
 
         return {
@@ -267,6 +286,11 @@ class TopographyEngine:
             "obstruction_lat": None,
             "profile": pts,
             "note": None,
+            "algorithm": self.ALGORITHM_LOS,
+            "assumptions": self.LOS_ASSUMPTIONS,
+            "sample_distance_m": sample_distance_m,
+            "observer_height_m": observer_height_m,
+            "target_height_m": target_height_m,
         }
 
     def viewshed(
@@ -327,7 +351,15 @@ class TopographyEngine:
         result.FlushCache()
         result = None
         src_ds = None
-        return {"output": out_path, "max_distance_m": max_distance_m}
+        return {
+            "output": out_path,
+            "max_distance_m": max_distance_m,
+            "algorithm": self.ALGORITHM_VIEWSHED,
+            "assumptions": self.VIEWSHED_ASSUMPTIONS,
+            "curvature_coeff": curvature_coeff,
+            "observer_height_m": observer_height_m,
+            "target_height_m": target_height_m,
+        }
 
     # ── helpers ──────────────────────────────────────────────
 

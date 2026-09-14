@@ -12,6 +12,10 @@ function Private({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return (
+    <>
+      <a href="#main-map" className="skip-link">
+        Saltar al mapa
+      </a>
     <Routes>
       <Route path="/login" element={<Login />} />
       <Route
@@ -32,5 +36,6 @@ export default function App() {
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
+    </>
   );
 }

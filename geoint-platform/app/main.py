@@ -19,6 +19,8 @@ from app.api.routes.topography import router as topography_router
 from app.api.routes.workspaces import router as workspaces_router
 from app.api.routes.alerts import router as alerts_router
 from app.api.routes.admin_jobs import router as admin_jobs_router
+from app.api.routes.analytics import router as analytics_router
+from app.api.routes.me import router as me_router
 from app.api.routes.websocket import router as websocket_router
 from app.auth.router import router as auth_router
 from app.core.config import settings
@@ -62,7 +64,7 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    version="2.3.1",
+    version="2.4.0",
     lifespan=lifespan,
 )
 
@@ -111,6 +113,8 @@ app.include_router(topography_router)
 app.include_router(workspaces_router)
 app.include_router(alerts_router)
 app.include_router(admin_jobs_router)
+app.include_router(analytics_router)
+app.include_router(me_router)
 
 
 @app.get("/metrics")

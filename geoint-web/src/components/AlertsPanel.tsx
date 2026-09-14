@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { t } from "@/i18n";
 import {
   ackAlert,
   fetchAlertDeliveries,
@@ -66,9 +67,9 @@ export function AlertsPanel() {
 
   return (
     <div className="panel">
-      <h3>Alertas geofence</h3>
+      <h3>{t("alerts")}</h3>
       {err && <p className="error">{err}</p>}
-      {alerts.length === 0 && <p className="muted">Sin alertas abiertas</p>}
+      {alerts.length === 0 && <p className="muted">{t("noOpenAlerts")}</p>}
       <ul className="alert-list">
         {alerts.map((a) => (
           <li key={a.id} className={`alert sev-${a.severity}`}>

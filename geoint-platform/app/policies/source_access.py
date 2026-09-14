@@ -12,8 +12,6 @@ from dataclasses import dataclass
 from enum import StrEnum
 from typing import Any
 
-from fastapi import HTTPException, status
-
 from app.auth.models import Principal
 
 
@@ -237,6 +235,8 @@ def can_admin_source(principal: Principal, source_id: str) -> bool:
 
 
 def assert_can_read_source(principal: Principal, source_id: str) -> None:
+    from fastapi import HTTPException, status
+
     if not can_read_source(principal, source_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -252,6 +252,8 @@ def assert_can_read_source(principal: Principal, source_id: str) -> None:
 
 
 def assert_can_admin_source(principal: Principal, source_id: str) -> None:
+    from fastapi import HTTPException, status
+
     if not can_admin_source(principal, source_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -301,6 +303,8 @@ def filter_sources_for_principal(
 
 
 def assert_ingestion_allowed(source_id: str) -> None:
+    from fastapi import HTTPException, status
+
     """Ingestión worker: OpenSky solo si el job está marcado experimental y flag global."""
     from app.core.config import settings
 

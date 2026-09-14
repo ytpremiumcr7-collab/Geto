@@ -427,3 +427,35 @@ export type AlertDelivery = {
 export async function fetchAlertDeliveries(alertId: string) {
   return api<{ deliveries: AlertDelivery[] }>(`/api/v1/alerts/${alertId}/deliveries`);
 }
+
+
+export type MeResponse = {
+  user_id: string;
+  tenant_id: string;
+  roles: string[];
+  permissions: string[];
+  sources: Array<{
+    source_id: string;
+    access_policy: string;
+    read_permission: string | null;
+    admin_permission: string | null;
+    can_read: boolean;
+    can_admin: boolean;
+  }>;
+};
+
+export async function fetchMe() {
+  return api<MeResponse>("/api/v1/me");
+}
+
+export async function fetchAnalyticsTemplates() {
+  return api<{ enabled: boolean; templates: Array<{ id: string; description: string }> }>(
+    "/api/v1/analytics/templates"
+  );
+}
+
+export async function fetchAnalyticsQuery(templateId: string) {
+  return api<{ enabled: boolean; rows: unknown[]; error?: string }>(
+    `/api/v1/analytics/query/${encodeURIComponent(templateId)}`
+  );
+}

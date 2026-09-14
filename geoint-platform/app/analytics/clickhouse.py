@@ -1,94 +1,136 @@
-"""Sink analítico ClickHouse (observaciones agregables / replay analytics).
-
-ClickHouse ya está en docker-compose. Este writer es at-least-once best-effort:
-no sustituye PostGIS como fuente de verdad operacional.
-"""
+"""ClickHouse analytics client — product queries (not just connectivity)."""
 
 from __future__ import annotations
 
+import logging
 from typing import Any
+from urllib.parse import urlencode
 
-import structlog
+import httpx
 
 from app.core.config import settings
 
-log = structlog.get_logger()
+log = logging.getLogger(__name__)
 
-DDL = """
-CREATE TABLE IF NOT EXISTS geoint_observations (
-    tenant_id String,
-    entity_id String,
-    entity_type String,
-    source_id String,
-    observed_at DateTime64(3, 'UTC'),
-    received_at DateTime64(3, 'UTC'),
-    lon Nullable(Float64),
-    lat Nullable(Float64),
-    altitude_m Nullable(Float64),
-    speed_mps Nullable(Float64),
-    heading_deg Nullable(Float64),
-    confidence Nullable(Float64)
-) ENGINE = MergeTree()
-PARTITION BY toYYYYMM(observed_at)
-ORDER BY (tenant_id, source_id, entity_id, observed_at)
-"""
+# Allowlisted query templates only (no arbitrary SQL from clients)
+QUERY_TEMPLATES: dict[str, str] = {
+    "observations_by_source_24h": """
+        SELECT source_id, count() AS n
+        FROM geoint.observations
+        WHERE tenant_id = {tenant:String}
+          AND observed_at >= now() - INTERVAL 24 HOUR
+        GROUP BY source_id
+        ORDER BY n DESC
+        LIMIT 50
+    """,
+    "observations_per_hour_24h": """
+        SELECT toStartOfHour(observed_at) AS hour, count() AS n
+        FROM geoint.observations
+        WHERE tenant_id = {tenant:String}
+          AND observed_at >= now() - INTERVAL 24 HOUR
+        GROUP BY hour
+        ORDER BY hour
+    """,
+    "entity_types_24h": """
+        SELECT entity_type, count() AS n
+        FROM geoint.observations
+        WHERE tenant_id = {tenant:String}
+          AND observed_at >= now() - INTERVAL 24 HOUR
+        GROUP BY entity_type
+        ORDER BY n DESC
+        LIMIT 30
+    """,
+    "top_entities_24h": """
+        SELECT entity_id, entity_type, count() AS n
+        FROM geoint.observations
+        WHERE tenant_id = {tenant:String}
+          AND observed_at >= now() - INTERVAL 24 HOUR
+        GROUP BY entity_id, entity_type
+        ORDER BY n DESC
+        LIMIT 25
+    """,
+}
 
 
-class ClickHouseSink:
-    def __init__(self) -> None:
-        self.url = getattr(settings, "clickhouse_url", "http://localhost:8123")
-        self.enabled = getattr(settings, "clickhouse_enabled", False)
-        self._ready = False
+class ClickHouseClient:
+    def __init__(self, url: str | None = None):
+        self.url = (url or settings.clickhouse_url).rstrip("/")
+        self.enabled = bool(getattr(settings, "clickhouse_enabled", False))
 
-    async def ensure_schema(self) -> None:
+    async def ping(self) -> bool:
         if not self.enabled:
-            return
-        import httpx
+            return False
+        try:
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                r = await client.get(f"{self.url}/ping")
+                return r.status_code == 200
+        except Exception:
+            return False
 
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post(self.url, content=DDL)
-            r.raise_for_status()
-        self._ready = True
-
-    async def write_observations(
+    async def query(
         self,
-        rows: list[dict[str, Any]],
-        tenant_id: str = "default",
-    ) -> int:
-        if not self.enabled or not rows:
-            return 0
-        if not self._ready:
-            await self.ensure_schema()
-        import httpx
+        template_id: str,
+        *,
+        tenant_id: str,
+        params: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        if not self.enabled:
+            return {
+                "enabled": False,
+                "template_id": template_id,
+                "rows": [],
+                "note": "ClickHouse disabled (CLICKHOUSE_ENABLED=false)",
+            }
+        sql = QUERY_TEMPLATES.get(template_id)
+        if not sql:
+            raise ValueError(f"Unknown template_id: {template_id}. Allowed: {sorted(QUERY_TEMPLATES)}")
 
-        lines = []
-        for o in rows:
-            pos = o.get("position") or {}
-            lines.append(
-                {
-                    "tenant_id": tenant_id,
-                    "entity_id": o.get("entity_id"),
-                    "entity_type": o.get("entity_type"),
-                    "source_id": o.get("source_id"),
-                    "observed_at": o.get("observed_at"),
-                    "received_at": o.get("received_at"),
-                    "lon": pos.get("lon"),
-                    "lat": pos.get("lat"),
-                    "altitude_m": pos.get("altitude_m"),
-                    "speed_mps": o.get("speed_mps"),
-                    "heading_deg": o.get("heading_deg"),
-                    "confidence": o.get("confidence"),
+        # Parameterized via ClickHouse HTTP query params
+        q_params = {
+            "default_format": "JSON",
+            "param_tenant": tenant_id,
+        }
+        if params:
+            for k, v in params.items():
+                q_params[f"param_{k}"] = str(v)
+
+        body = sql.strip()
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                r = await client.post(
+                    f"{self.url}/?{urlencode(q_params)}",
+                    content=body.encode("utf-8"),
+                    headers={"Content-Type": "text/plain"},
+                )
+                if r.status_code >= 400:
+                    log.warning("clickhouse_query_failed status=%s body=%s", r.status_code, r.text[:500])
+                    return {
+                        "enabled": True,
+                        "template_id": template_id,
+                        "rows": [],
+                        "error": f"ClickHouse HTTP {r.status_code}",
+                        "detail": r.text[:500],
+                    }
+                data = r.json()
+                rows = data.get("data") or []
+                return {
+                    "enabled": True,
+                    "template_id": template_id,
+                    "rows": rows,
+                    "statistics": data.get("statistics"),
+                    "meta": data.get("meta"),
                 }
-            )
-        # JSONEachRow
-        body = "\n".join(__import__("json").dumps(x, default=str) for x in lines)
-        async with httpx.AsyncClient(timeout=60) as client:
-            r = await client.post(
-                f"{self.url}/?query=INSERT%20INTO%20geoint_observations%20FORMAT%20JSONEachRow",
-                content=body,
-                headers={"Content-Type": "application/json"},
-            )
-            if not r.is_success:
-                log.warning("clickhouse_insert_failed", status=r.status_code, body=r.text[:300])
-                return 0
-        return len(lines)
+        except Exception as e:
+            log.exception("clickhouse_query_error")
+            return {
+                "enabled": True,
+                "template_id": template_id,
+                "rows": [],
+                "error": str(e),
+            }
+
+    def list_templates(self) -> list[dict[str, str]]:
+        return [
+            {"id": k, "description": v.strip().split("\n")[0][:120]}
+            for k, v in QUERY_TEMPLATES.items()
+        ]

@@ -15,3 +15,15 @@ class Principal:
 
     def has_any_role(self, *roles: str) -> bool:
         return bool(self.roles.intersection(roles))
+
+    def permissions(self) -> frozenset[str]:
+        """Union of ROLE_PERMISSIONS for assigned roles (backend source of truth)."""
+        from app.policies.source_access import ROLE_PERMISSIONS
+
+        perms: set[str] = set()
+        for role in self.roles:
+            perms |= set(ROLE_PERMISSIONS.get(role, frozenset()))
+        return frozenset(perms)
+
+    def has_permission(self, permission: str) -> bool:
+        return permission in self.permissions()

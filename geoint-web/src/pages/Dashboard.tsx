@@ -245,7 +245,7 @@ export function Dashboard() {
           <GeofencesPanel geofences={geofences} />
         </aside>
 
-        <main className="map-stage">
+        <main id="main-map" className="map-stage" tabIndex={-1} role="main">
           <MapView
             observations={observations}
             geofences={geofences}

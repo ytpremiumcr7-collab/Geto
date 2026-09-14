@@ -107,3 +107,8 @@ GDAL ya estaba en el Dockerfile (`gdal-bin`, `libgdal-dev`).
 - `clip_bbox` antes de slope/aspect/hillshade (rasterio window; GDAL Warp si CRS proyectado)
 - Fix: routes usan `get_db` (antes `get_session` inexistente)
 - Evidencia tests: 10 passed, 2 skipped; Terrarium live CDMX 2235 m
+
+## Precisión LOS / Viewshed
+
+Ver [TOPOGRAPHY-LOS-VIEWSHED.md](./TOPOGRAPHY-LOS-VIEWSHED.md).
+
