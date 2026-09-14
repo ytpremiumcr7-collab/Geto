@@ -1,0 +1,18 @@
+# Staging stack = prod compose + analytics profile defaults + published health ports
+# Usage:
+#   export GEOINT_ENV_FILE=.env.staging
+#   docker compose -f docker-compose.staging.yml --profile analytics up -d
+#   python scripts/staging_verify.py
+
+include:
+  - path: docker-compose.prod.yml
+
+services:
+  geoint-alert-notifier:
+    ports:
+      - "${ALERT_NOTIFIER_PUBLISH_PORT:-8081}:8081"
+
+  clickhouse:
+    profiles: ["analytics"]
+    ports:
+      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"

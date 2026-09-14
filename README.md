@@ -85,3 +85,8 @@ GitHub Actions: Ruff → unit tests → **E2E PostGIS smoke + product flow** →
 ## DEM / LOS
 
 Terrain products are **decision-support**, not certified flight/safety outputs. See topography docs for algorithm assumptions and DEM resolution limits.
+
+## Staging
+
+See [geoint-platform/docs/STAGING.md](geoint-platform/docs/STAGING.md) for JWKS + ClickHouse + notifier health before formal verification audit.
+

@@ -29,14 +29,18 @@ def main() -> int:
                 return 1
             print("OK", stmt.split()[0:4])
         if os.environ.get("CLICKHOUSE_SEED") == "1":
-            seed = """
-            INSERT INTO geoint.observations
-            (tenant_id, source_id, entity_id, entity_type, observed_at, lon, lat)
-            VALUES
-            ('default', 'opensky', 'SEED-1', 'aircraft', now64(3), -99.1, 19.4)
-            """
+            seed_path = Path(__file__).resolve().parents[1] / "scripts" / "clickhouse_seed_staging.sql"
+            if seed_path.exists():
+                seed = seed_path.read_text()
+            else:
+                seed = """
+                INSERT INTO geoint.observations
+                (tenant_id, source_id, entity_id, entity_type, observed_at, lon, lat)
+                VALUES
+                ('default', 'opensky', 'SEED-1', 'aircraft', now64(3), -99.1, 19.4)
+                """
             r = client.post(f"{URL}/", content=seed.encode())
-            print("SEED", r.status_code, r.text[:80])
+            print("SEED", r.status_code, r.text[:120])
     print("ClickHouse bootstrap OK")
     return 0
 

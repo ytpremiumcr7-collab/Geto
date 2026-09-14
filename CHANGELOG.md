@@ -2,6 +2,15 @@
 
 All notable product changes to GEOINT Platform (Geto).
 
+## [2.7.0] — 2026-09-14
+
+### Added
+- Staging real pack: `.env.staging.example`, `docker-compose.staging.yml`
+- `scripts/staging_up.sh`, `staging_verify.py` (JWKS + CH data + notifier health)
+- Lab JWKS server `scripts/dev_jwks_server.py` for staging without external IdP
+- ClickHouse seed SQL for staging observations
+- `docs/STAGING.md`
+
 ## [2.6.1] — 2026-09-14
 
 ### Added
