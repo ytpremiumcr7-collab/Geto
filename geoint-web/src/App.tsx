@@ -11,9 +11,9 @@ import { AlertsPage } from "@/pages/AlertsPage";
 import "./styles/app.css";
 
 function Private({ children }: { children: React.ReactNode }) {
-  const { token, loading } = useAuth();
+  const { authenticated, loading } = useAuth();
   if (loading) return <p className="page-pad muted">…</p>;
-  if (!token) return <Navigate to="/login" replace />;
+  if (!authenticated) return <Navigate to="/login" replace />;
   return <>{children}</>;
 }
 
