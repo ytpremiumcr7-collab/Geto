@@ -15,7 +15,7 @@ from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.models_dlq import DlqMessage
-from app.db.session import SessionLocal
+from app.db.tenant import system_worker_session, tenant_session
 from app.ingestion.dispatcher import SourceDispatcher
 from app.jobs.repository import IdempotencyRepository, JobRepository
 from app.messaging.jetstream import JetStreamClient
@@ -117,7 +117,7 @@ class SourceWorker:
 
             # Atomic claim BEFORE side effects (processing lease)
             worker_id = f"{self.durable}:{os.getpid()}"
-            async with SessionLocal() as session:
+            async with system_worker_session() as session:
                 claim = await self.idempotency.try_claim(
                     session,
                     message_id=message_id,
@@ -137,7 +137,7 @@ class SourceWorker:
 
             # We own the lease — execute side effects
             try:
-                async with SessionLocal() as session:
+                async with tenant_session(tenant_id) as session:
                     await self.dispatcher.execute(
                         session,
                         source_id=source_id,
@@ -148,14 +148,14 @@ class SourceWorker:
                         message_id=message_id,
                     )
                     await self.jobs.mark_success(session, job_id)
-                async with SessionLocal() as session:
+                async with system_worker_session() as session:
                     await self.idempotency.mark_completed(
                         session, message_id=message_id, worker_id=worker_id
                     )
                 await msg.ack()
                 log.info("job_ok", job_id=str(job_id), source=source_id, delivery=delivery)
             except Exception:
-                async with SessionLocal() as session:
+                async with system_worker_session() as session:
                     await self.idempotency.mark_failed(
                         session, message_id=message_id, worker_id=worker_id
                     )
@@ -176,10 +176,11 @@ class SourceWorker:
                         error=str(exc),
                         delivery_count=delivery,
                     )
-                    async with SessionLocal() as session:
+                    dlq_tenant_id = body.get("tenant_id") or "default"
+                    async with tenant_session(dlq_tenant_id) as session:
                         session.add(
                             DlqMessage(
-                                tenant_id=body.get("tenant_id") or "default",
+                                tenant_id=dlq_tenant_id,
                                 source_id=source_id,
                                 original_subject=subject,
                                 payload=body,
@@ -191,7 +192,7 @@ class SourceWorker:
                         await session.commit()
                     job_id_raw = body.get("job_id")
                     if job_id_raw:
-                        async with SessionLocal() as session:
+                        async with tenant_session(dlq_tenant_id) as session:
                             await self.jobs.mark_failure(session, UUID(job_id_raw), str(exc))
                 except Exception:
                     log.exception("dlq_publish_failed")
@@ -202,7 +203,8 @@ class SourceWorker:
             try:
                 body = json.loads(msg.data.decode()) if msg.data else {}
                 if body.get("job_id"):
-                    async with SessionLocal() as session:
+                    retry_tenant_id = body.get("tenant_id") or "default"
+                    async with tenant_session(retry_tenant_id) as session:
                         await self.jobs.mark_failure(session, UUID(body["job_id"]), str(exc))
             except Exception:
                 pass
