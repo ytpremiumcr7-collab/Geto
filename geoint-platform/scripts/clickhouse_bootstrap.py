@@ -29,7 +29,11 @@ def main() -> int:
                 return 1
             print("OK", stmt.split()[0:4])
         if os.environ.get("CLICKHOUSE_SEED") == "1":
-            seed_path = Path(__file__).resolve().parents[1] / "scripts" / "clickhouse_seed_staging.sql"
+            seed_path = (
+                Path(__file__).resolve().parents[1]
+                / "scripts"
+                / "clickhouse_seed_staging.sql"
+            )
             if seed_path.exists():
                 seed = seed_path.read_text()
             else:

@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import text, select
+from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.jobs.models import ProcessedMessage, SourceJob
@@ -109,8 +109,6 @@ class IdempotencyRepository:
           completed — already finished successfully; ACK
           busy — another worker holds a live lease; NAK for redelivery
         """
-        from sqlalchemy.dialects.postgresql import insert
-
         now = datetime.now(UTC)
         lease_until = now + timedelta(seconds=max(30, lease_seconds))
         msg_uuid = uuid4()

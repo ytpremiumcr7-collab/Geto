@@ -17,14 +17,13 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import structlog
-from sqlalchemy import text
-from app.db.tenant import set_system_worker, set_tenant
 
 from app.alerts.delivery import DeliveryService
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.security_bootstrap import validate_settings
 from app.db.session import SessionLocal
+from app.db.tenant import set_system_worker, set_tenant
 
 log = structlog.get_logger()
 

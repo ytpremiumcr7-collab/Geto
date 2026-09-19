@@ -40,7 +40,7 @@ def issue_ticket(
     exp = int(time.time()) + max(60, ttl_s)
     body = f"{tenant_id}|{user_id}|{exp}"
     sig = hmac.new(_secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()
-    token = base64.urlsafe_b64encode(f"{body}|{sig}".encode("utf-8")).decode("ascii")
+    token = base64.urlsafe_b64encode(f"{body}|{sig}".encode()).decode("ascii")
     return token, exp
 
 

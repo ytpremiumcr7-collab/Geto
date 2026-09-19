@@ -24,7 +24,12 @@ from app.db.models import Base
 class SourceJob(Base):
     __tablename__ = "source_jobs"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "source_id", "name", name="uq_source_jobs_tenant_source_name"),
+        UniqueConstraint(
+            "tenant_id",
+            "source_id",
+            "name",
+            name="uq_source_jobs_tenant_source_name",
+        ),
         Index("ix_source_jobs_due", "enabled", "next_run_at", "status"),
     )
 

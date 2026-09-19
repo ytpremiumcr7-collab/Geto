@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from shapely.geometry import MultiPolygon, Polygon, mapping, shape
+from shapely.geometry import MultiPolygon, shape
 from shapely.validation import explain_validity, make_valid
 
 MAX_COORDINATES = 50_000

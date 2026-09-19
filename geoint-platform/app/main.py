@@ -126,8 +126,8 @@ async def metrics(request: Request):
         if not auth:
             return Response(status_code=401, content=b"Unauthorized")
         try:
-            from app.auth.jwt import JWTService
             from app.auth.dependencies import _api_key_principal
+            from app.auth.jwt import JWTService
 
             principal = None
             if auth.lower().startswith("bearer "):

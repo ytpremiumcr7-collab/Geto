@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
 from io import BytesIO
+from uuid import uuid4
 
 from minio import Minio
 
