@@ -86,7 +86,10 @@ class JobRepository:
         job.locked_until = None
         job.locked_by = None
         job.last_error = (error or "")[:4000]
-    class IdempotencyRepository:
+        await session.commit()
+
+
+class IdempotencyRepository:
     """Atomic claim before side effects: processing → completed | failed."""
 
     async def try_claim(
