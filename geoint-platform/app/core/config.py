@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     cors_allow_http: bool = False  # lab only: allow http:// origins when true
     # Trusted hosts for reverse-proxy deployments (comma-separated); empty = skip
     trusted_hosts: str = ""
+    trusted_proxy_cidrs: str = ""  # comma-separated CIDRs allowed to set X-Forwarded-For
 
     # Auth
     auth_disabled: bool = False
