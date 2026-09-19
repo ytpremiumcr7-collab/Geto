@@ -8,15 +8,25 @@ import {
   type ReactNode,
 } from "react";
 import { fetchMe, type MeResponse } from "@/api/client";
-import { clearAuth, getToken, getUser, setToken, setUser, logoutRemote } from "@/lib/auth";
+import {
+  clearAuth,
+  clearToken,
+  getToken,
+  getUser,
+  setToken,
+  setUser,
+  logoutRemote,
+  type AuthUser,
+} from "@/lib/auth";
 
 type AuthState = {
   token: string | null;
-  user: { user_id?: string; tenant_id?: string; roles?: string[] } | null;
+  user: AuthUser | null;
   me: MeResponse | null;
+  authenticated: boolean;
   loading: boolean;
   refreshMe: () => Promise<void>;
-  login: (token: string, user?: { user_id: string; tenant_id: string; roles: string[] }) => void;
+  login: (token: string | null, user?: AuthUser) => Promise<void>;
   logout: () => void;
   hasPermission: (perm: string) => boolean;
   canReadSource: (sourceId: string) => boolean;
@@ -27,57 +37,52 @@ const AuthContext = createContext<AuthState | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [token, setTok] = useState<string | null>(() => getToken());
-  const [user, setUsr] = useState(() => getUser());
+  const [user, setUsr] = useState<AuthUser | null>(() => getUser());
   const [me, setMe] = useState<MeResponse | null>(null);
-  const [loading, setLoading] = useState(!!getToken());
+  const [loading, setLoading] = useState(true);
 
   const refreshMe = useCallback(async () => {
-    if (!getToken()) {
-      setMe(null);
-      setLoading(false);
-      return;
-    }
     setLoading(true);
     try {
-      const m = await fetchMe();
-      setMe(m);
-      setUsr({
-        user_id: m.user_id,
-        tenant_id: m.tenant_id,
-        roles: m.roles,
-      });
-      setUser({
-        user_id: m.user_id,
-        tenant_id: m.tenant_id,
-        roles: m.roles,
-      });
+      const current = await fetchMe();
+      const identity: AuthUser = {
+        user_id: current.user_id,
+        tenant_id: current.tenant_id,
+        roles: current.roles,
+      };
+      setMe(current);
+      setUsr(identity);
+      setUser(identity);
     } catch {
+      clearAuth();
+      setTok(null);
+      setUsr(null);
       setMe(null);
-      void logoutRemote(); // clears storage + HttpOnly cookie
-    clearAuth();
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (token) void refreshMe();
-    else {
-      setMe(null);
-      setLoading(false);
-    }
-  }, [token, refreshMe]);
+    void refreshMe();
+  }, [refreshMe]);
 
   const login = useCallback(
-    (t: string, u?: { user_id: string; tenant_id: string; roles: string[] }) => {
-      setToken(t);
-      setTok(t);
-      if (u) {
-        setUser(u);
-        setUsr(u);
+    async (nextToken: string | null, nextUser?: AuthUser) => {
+      if (nextToken) {
+        setToken(nextToken);
+        setTok(nextToken);
+      } else {
+        clearToken();
+        setTok(null);
       }
+      if (nextUser) {
+        setUser(nextUser);
+        setUsr(nextUser);
+      }
+      await refreshMe();
     },
-    [],
+    [refreshMe],
   );
 
   const logout = useCallback(() => {
@@ -95,13 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const canReadSource = useCallback(
     (sourceId: string) =>
-      !!me?.sources?.find((s) => s.source_id === sourceId)?.can_read,
+      !!me?.sources?.find((source) => source.source_id === sourceId)?.can_read,
     [me],
   );
 
   const canAdminSource = useCallback(
     (sourceId: string) =>
-      !!me?.sources?.find((s) => s.source_id === sourceId)?.can_admin,
+      !!me?.sources?.find((source) => source.source_id === sourceId)?.can_admin,
     [me],
   );
 
@@ -110,6 +115,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       token,
       user,
       me,
+      authenticated: me !== null,
       loading,
       refreshMe,
       login,
