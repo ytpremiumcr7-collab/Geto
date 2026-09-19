@@ -110,7 +110,6 @@ class IdempotencyRepository:
           busy — another worker holds a live lease; NAK for redelivery
         """
         from sqlalchemy.dialects.postgresql import insert
-        from sqlalchemy import text
 
         now = datetime.now(UTC)
         lease_until = now + timedelta(seconds=max(30, lease_seconds))
@@ -151,24 +150,27 @@ class IdempotencyRepository:
         )
         result = await session.execute(stmt)
         row = result.first()
-        await session.commit()
 
         if row is not None and row.worker_id == worker_id and row.status == "processing":
-            return "claimed"
+            outcome = "claimed"
+        else:
+            # Inspect the conflicting row before commit. RLS set_config is
+            # transaction-local, so querying after commit would drop worker context.
+            cur = await session.execute(
+                select(ProcessedMessage).where(ProcessedMessage.message_id == message_id)
+            )
+            existing = cur.scalar_one_or_none()
+            if existing is None:
+                outcome = "busy"
+            elif existing.status == "completed":
+                outcome = "completed"
+            elif existing.worker_id == worker_id and existing.status == "processing":
+                outcome = "claimed"
+            else:
+                outcome = "busy"
 
-        # Conflict did not update us — inspect current state
-        cur = await session.execute(
-            select(ProcessedMessage).where(ProcessedMessage.message_id == message_id)
-        )
-        existing = cur.scalar_one_or_none()
-        if existing is None:
-            # Should not happen; treat as claimable next time
-            return "busy"
-        if existing.status == "completed":
-            return "completed"
-        if existing.worker_id == worker_id and existing.status == "processing":
-            return "claimed"
-        return "busy"
+        await session.commit()
+        return outcome
 
     async def mark_completed(
         self,
