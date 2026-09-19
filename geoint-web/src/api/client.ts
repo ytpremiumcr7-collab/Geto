@@ -34,9 +34,6 @@ export async function api<T = unknown>(
   });
   if (res.status === 401) {
     clearAuth();
-    if (!path.includes("/auth/token")) {
-      window.location.href = "/login";
-    }
   }
   const text = await res.text();
   let data: unknown = null;
@@ -90,8 +87,12 @@ export async function issueToken(body: {
   roles: string[];
   bootstrap_secret?: string;
 }) {
-  return api<{ access_token: string; token_type: string }>(
-    "/api/v1/auth/token",
+  return api<{
+    access_token: string | null;
+    token_type: string;
+    cookie_mode: boolean;
+    authenticated: boolean;
+  }>("/api/v1/auth/token",
     { method: "POST", body: JSON.stringify(body) }
   );
 }
@@ -323,6 +324,7 @@ export async function fetchSlopePreview(
   const token = getToken() || "";
   const res = await fetch(`${base}/api/v1/topography/slope-preview?${q}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
+    credentials: "include",
   });
   if (!res.ok) {
     const text = await res.text();
