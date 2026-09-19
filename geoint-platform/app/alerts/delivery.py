@@ -7,7 +7,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_, select
+from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.alerts.models import AlertChannel, AlertDelivery, GeofenceAlert
@@ -79,32 +79,62 @@ class DeliveryService:
         )
         return [_delivery_dict(d) for d in result.scalars().all()]
 
-    async def claim_batch(self, session: AsyncSession, *, limit: int = 20) -> list[AlertDelivery]:
-        """Claim pending/failed deliveries ready for retry (system tenant)."""
+    async def claim_batch(
+        self,
+        session: AsyncSession,
+        *,
+        worker_id: str,
+        limit: int = 20,
+        lease_seconds: int = 120,
+    ) -> list[AlertDelivery]:
+        """Claim ready deliveries or reclaim an expired sending lease."""
         now = datetime.now(UTC)
+        lease_until = now + timedelta(seconds=max(30, lease_seconds))
+        ready = and_(
+            AlertDelivery.status.in_(("pending", "failed")),
+            or_(
+                AlertDelivery.next_attempt_at.is_(None),
+                AlertDelivery.next_attempt_at <= now,
+            ),
+        )
+        expired = and_(
+            AlertDelivery.status == "sending",
+            AlertDelivery.lease_until.is_not(None),
+            AlertDelivery.lease_until < now,
+        )
         result = await session.execute(
             select(AlertDelivery)
             .where(
-                AlertDelivery.status.in_(("pending", "failed")),
                 AlertDelivery.attempts < AlertDelivery.max_attempts,
-                or_(
-                    AlertDelivery.next_attempt_at.is_(None),
-                    AlertDelivery.next_attempt_at <= now,
-                ),
+                or_(ready, expired),
             )
             .order_by(AlertDelivery.created_at)
             .limit(limit)
             .with_for_update(skip_locked=True)
         )
         rows = list(result.scalars().all())
-        for d in rows:
-            d.status = "sending"
-            d.updated_at = now
+        for delivery in rows:
+            delivery.status = "sending"
+            delivery.claimed_by = worker_id
+            delivery.lease_until = lease_until
+            delivery.updated_at = now
         if rows:
             await session.flush()
         return rows
 
-    async def process_one(self, session: AsyncSession, delivery: AlertDelivery) -> dict[str, Any]:
+    async def process_one(
+        self,
+        session: AsyncSession,
+        *,
+        delivery_id: UUID,
+        worker_id: str,
+    ) -> dict[str, Any]:
+        delivery = await session.get(AlertDelivery, delivery_id)
+        if delivery is None:
+            raise LookupError(f"alert delivery not found: {delivery_id}")
+        if delivery.status != "sending" or delivery.claimed_by != worker_id:
+            raise RuntimeError("alert delivery lease is not owned by this worker")
+
         alert = await session.get(GeofenceAlert, delivery.alert_id)
         channel = await session.get(AlertChannel, delivery.channel_id)
         now = datetime.now(UTC)
@@ -113,6 +143,8 @@ class DeliveryService:
         if not alert:
             delivery.status = "skipped"
             delivery.last_error = "alert not found"
+            delivery.claimed_by = None
+            delivery.lease_until = None
             delivery.updated_at = now
             return _delivery_dict(delivery)
 
@@ -120,19 +152,27 @@ class DeliveryService:
         if alert.status in ("resolved",):
             delivery.status = "skipped"
             delivery.last_error = f"alert status={alert.status}"
+            delivery.claimed_by = None
+            delivery.lease_until = None
             delivery.updated_at = now
             return _delivery_dict(delivery)
 
         if not channel or not channel.enabled:
             delivery.status = "skipped"
             delivery.last_error = "channel missing or disabled"
+            delivery.claimed_by = None
+            delivery.lease_until = None
             delivery.updated_at = now
             return _delivery_dict(delivery)
 
         alert_payload = _alert_dict(alert)
         alert_payload["tenant_id"] = delivery.tenant_id
         notifier = get_notifier(delivery.channel_type)
-        result = await notifier.send(alert=alert_payload, channel_config=channel.config or {})
+        result = await notifier.send(
+            alert=alert_payload,
+            channel_config=channel.config or {},
+            idempotency_key=str(delivery.id),
+        )
 
         if result.ok:
             delivery.status = "delivered"
@@ -148,5 +188,7 @@ class DeliveryService:
                 delay = min(3600, 30 * (2 ** max(0, delivery.attempts - 1)))
                 delivery.next_attempt_at = now + timedelta(seconds=delay)
                 delivery.status = "pending"
+        delivery.claimed_by = None
+        delivery.lease_until = None
         delivery.updated_at = now
         return _delivery_dict(delivery)
