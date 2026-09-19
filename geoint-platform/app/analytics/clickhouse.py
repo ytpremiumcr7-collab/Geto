@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
+from uuid import NAMESPACE_URL, uuid5
 from urllib.parse import urlencode
 
 import httpx
@@ -16,7 +17,7 @@ log = logging.getLogger(__name__)
 # Allowlisted query templates only (no arbitrary SQL from clients)
 QUERY_TEMPLATES: dict[str, str] = {
     "observations_by_source_24h": """
-        SELECT source_id, count() AS n
+        SELECT source_id, uniqExact(observation_id) AS n
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
@@ -25,7 +26,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         LIMIT 50
     """,
     "observations_per_hour_24h": """
-        SELECT toStartOfHour(observed_at) AS hour, count() AS n
+        SELECT toStartOfHour(observed_at) AS hour, uniqExact(observation_id) AS n
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
@@ -33,7 +34,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         ORDER BY hour
     """,
     "entity_types_24h": """
-        SELECT entity_type, count() AS n
+        SELECT entity_type, uniqExact(observation_id) AS n
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
@@ -42,7 +43,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         LIMIT 30
     """,
     "top_entities_24h": """
-        SELECT entity_id, entity_type, count() AS n
+        SELECT entity_id, entity_type, uniqExact(observation_id) AS n
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
@@ -51,6 +52,15 @@ QUERY_TEMPLATES: dict[str, str] = {
         LIMIT 25
     """,
 }
+
+
+def observation_identity(tenant_id: str, row: dict[str, Any]) -> str:
+    """Stable logical identity matching the PostgreSQL observation uniqueness key."""
+    source_id = str(row.get("source_id") or "")
+    entity_id = str(row.get("entity_id") or "")
+    observed_at = str(row.get("observed_at") or "")
+    material = f"geto-observation|{tenant_id}|{source_id}|{entity_id}|{observed_at}"
+    return str(uuid5(NAMESPACE_URL, material))
 
 
 class ClickHouseSink:
@@ -95,6 +105,7 @@ class ClickHouseSink:
             }
             normalized.append(
                 {
+                    "observation_id": observation_identity(tenant_id, row),
                     "tenant_id": tenant_id,
                     "source_id": str(row.get("source_id") or ""),
                     "entity_id": str(row.get("entity_id") or ""),
@@ -117,7 +128,7 @@ class ClickHouseSink:
 
         query = (
             "INSERT INTO geoint.observations "
-            "(tenant_id, source_id, entity_id, entity_type, observed_at, "
+            "(observation_id, tenant_id, source_id, entity_id, entity_type, observed_at, "
             "lon, lat, alt_m, properties) FORMAT JSONEachRow"
         )
         body = "\n".join(
