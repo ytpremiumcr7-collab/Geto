@@ -1,4 +1,3 @@
-from app.db.tenant import set_system_worker
 """Scheduler de SourceJobs: claim + publish a JetStream."""
 
 from __future__ import annotations
@@ -14,6 +13,7 @@ import structlog
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.session import SessionLocal
+from app.db.tenant import set_system_worker
 from app.jobs.repository import JobRepository
 from app.messaging.jetstream import JetStreamClient
 
