@@ -11,9 +11,13 @@ RLS system policies require BOTH:
 from __future__ import annotations
 
 import os
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.db.session import SessionLocal
 
 SYSTEM_TENANT = "__system__"
 
@@ -64,3 +68,19 @@ async def clear_tenant(session: AsyncSession) -> None:
 async def get_tenant_session(session: AsyncSession, tenant_id: str) -> AsyncSession:
     await set_tenant(session, tenant_id)
     return session
+
+
+@asynccontextmanager
+async def tenant_session(tenant_id: str) -> AsyncIterator[AsyncSession]:
+    """Open a session whose current transaction is tenant-bound for RLS."""
+    async with SessionLocal() as session:
+        await set_tenant(session, tenant_id)
+        yield session
+
+
+@asynccontextmanager
+async def system_worker_session() -> AsyncIterator[AsyncSession]:
+    """Open a cross-tenant worker session with the dual RLS claim applied."""
+    async with SessionLocal() as session:
+        await set_system_worker(session)
+        yield session
