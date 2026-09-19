@@ -27,7 +27,7 @@ export function Login() {
         tenant_id: tenantId,
         roles: roleList,
       });
-      login(tok.access_token, {
+      await login(tok.access_token, {
         user_id: userId,
         tenant_id: tenantId,
         roles: roleList,
