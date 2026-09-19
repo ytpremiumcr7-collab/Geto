@@ -49,6 +49,7 @@ def test_webhook_success_and_signature():
         assert headers["Content-Type"] == "application/json"
         expected = hmac.new(secret.encode(), content, hashlib.sha256).hexdigest()
         assert headers["X-Geoint-Signature"] == f"sha256={expected}"
+        assert headers["Idempotency-Key"] == "delivery-123"
         json.loads(content.decode())
         return mock_resp
 
@@ -62,6 +63,7 @@ def test_webhook_success_and_signature():
             WebhookNotifier().send(
                 alert=alert,
                 channel_config={"url": "https://hooks.example.com/geoint", "secret": secret},
+                idempotency_key="delivery-123",
             )
         )
     assert r.ok
