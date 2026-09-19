@@ -25,7 +25,11 @@ class NotifierResult:
 
 class Notifier(Protocol):
     async def send(
-        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+        self,
+        *,
+        alert: dict[str, Any],
+        channel_config: dict[str, Any],
+        idempotency_key: str | None = None,
     ) -> NotifierResult: ...
 
 
@@ -47,7 +51,11 @@ def build_alert_body(alert: dict[str, Any]) -> dict[str, Any]:
 
 class LogNotifier:
     async def send(
-        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+        self,
+        *,
+        alert: dict[str, Any],
+        channel_config: dict[str, Any],
+        idempotency_key: str | None = None,
     ) -> NotifierResult:
         body = build_alert_body(alert)
         log.info(
@@ -67,7 +75,11 @@ class WebhookNotifier:
         self.timeout = timeout
 
     async def send(
-        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+        self,
+        *,
+        alert: dict[str, Any],
+        channel_config: dict[str, Any],
+        idempotency_key: str | None = None,
     ) -> NotifierResult:
         url = (channel_config.get("url") or "").strip()
         if not url:
@@ -85,6 +97,8 @@ class WebhookNotifier:
         body = build_alert_body(alert)
         raw = json.dumps(body, separators=(",", ":"), default=str).encode("utf-8")
         headers = {"Content-Type": "application/json", "User-Agent": "geoint-alert-notifier/2.3"}
+        if idempotency_key:
+            headers["Idempotency-Key"] = idempotency_key
         extra = channel_config.get("headers") or {}
         if isinstance(extra, dict):
             headers.update({str(k): str(v) for k, v in extra.items()})
@@ -113,7 +127,11 @@ class SmtpNotifier:
     """Send email via SMTP. Channel config: {to, cc?, subject?}. Server from settings."""
 
     async def send(
-        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+        self,
+        *,
+        alert: dict[str, Any],
+        channel_config: dict[str, Any],
+        idempotency_key: str | None = None,
     ) -> NotifierResult:
         from app.core.config import settings
 
@@ -156,6 +174,8 @@ class SmtpNotifier:
         msg["Subject"] = subject
         msg["From"] = from_addr
         msg["To"] = to_addr
+        if idempotency_key:
+            msg["Message-ID"] = f"<geoint-delivery-{idempotency_key}@geto.local>"
         if channel_config.get("cc"):
             msg["Cc"] = channel_config["cc"]
         msg.set_content(text)
@@ -192,7 +212,11 @@ class WebsocketNotifier:
     """Publish alert to NATS for realtime UI fan-out (subject geoint.alert.<tenant>)."""
 
     async def send(
-        self, *, alert: dict[str, Any], channel_config: dict[str, Any]
+        self,
+        *,
+        alert: dict[str, Any],
+        channel_config: dict[str, Any],
+        idempotency_key: str | None = None,
     ) -> NotifierResult:
         try:
             from app.messaging.jetstream import JetStreamClient
@@ -205,7 +229,12 @@ class WebsocketNotifier:
             await js.connect()
             try:
                 assert js.js is not None
-                await js.js.publish(subject, json.dumps(body, default=str).encode())
+                headers = {"Nats-Msg-Id": idempotency_key} if idempotency_key else None
+                await js.js.publish(
+                    subject,
+                    json.dumps(body, default=str).encode(),
+                    headers=headers,
+                )
             finally:
                 await js.close()
             return NotifierResult(ok=True, meta={"subject": subject})
