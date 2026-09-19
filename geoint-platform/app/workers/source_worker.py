@@ -120,6 +120,7 @@ class SourceWorker:
             async with system_worker_session() as session:
                 claim = await self.idempotency.try_claim(
                     session,
+                    tenant_id=tenant_id,
                     message_id=message_id,
                     subject=subject,
                     source_id=source_id,
@@ -150,14 +151,20 @@ class SourceWorker:
                     await self.jobs.mark_success(session, job_id)
                 async with system_worker_session() as session:
                     await self.idempotency.mark_completed(
-                        session, message_id=message_id, worker_id=worker_id
+                        session,
+                        tenant_id=tenant_id,
+                        message_id=message_id,
+                        worker_id=worker_id,
                     )
                 await msg.ack()
                 log.info("job_ok", job_id=str(job_id), source=source_id, delivery=delivery)
             except Exception:
                 async with system_worker_session() as session:
                     await self.idempotency.mark_failed(
-                        session, message_id=message_id, worker_id=worker_id
+                        session,
+                        tenant_id=tenant_id,
+                        message_id=message_id,
+                        worker_id=worker_id,
                     )
                 raise
 
