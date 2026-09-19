@@ -147,6 +147,7 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     alert_notifier_poll_seconds: float = 2.0
     alert_notifier_batch_size: int = 20
+    alert_notifier_lease_seconds: int = 120
 
 
 @lru_cache
