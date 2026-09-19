@@ -20,9 +20,10 @@ class TokenRequest(BaseModel):
 
 
 class TokenResponse(BaseModel):
-    access_token: str
+    access_token: str | None = None
     token_type: str = "bearer"
     cookie_mode: bool = False
+    authenticated: bool = True
 
 
 def _set_auth_cookie(response: Response, token: str) -> None:
@@ -49,7 +50,7 @@ def _clear_auth_cookie(response: Response) -> None:
 
 @router.post("/token", response_model=TokenResponse)
 async def issue_token(request: Request, response: Response, body: TokenRequest):
-    """Issue JWT. In cookie mode also sets HttpOnly cookie (token still returned for SPA bootstrap)."""
+    """Issue JWT. Cookie mode keeps the credential exclusively in the HttpOnly cookie."""
     from app.middleware.rate_limit_mw import _client_ip
 
     client = _client_ip(request)
@@ -76,7 +77,7 @@ async def issue_token(request: Request, response: Response, body: TokenRequest):
     cookie_mode = bool(getattr(settings, "auth_cookie_mode", False))
     if cookie_mode:
         _set_auth_cookie(response, token)
-    return TokenResponse(access_token=token, cookie_mode=cookie_mode)
+    return TokenResponse(access_token=None if cookie_mode else token, cookie_mode=cookie_mode)
 
 
 @router.post("/logout")
