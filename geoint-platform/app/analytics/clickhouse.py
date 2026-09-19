@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any
 from urllib.parse import urlencode
@@ -50,6 +51,89 @@ QUERY_TEMPLATES: dict[str, str] = {
         LIMIT 25
     """,
 }
+
+
+class ClickHouseSink:
+    """Write normalized observation batches through ClickHouse HTTP.
+
+    The caller supplies tenant_id server-side; row data cannot override it.
+    Writes raise on HTTP errors so the transactional outbox can retry safely.
+    """
+
+    def __init__(self, url: str | None = None):
+        self.url = (url or settings.clickhouse_url).rstrip("/")
+        self.enabled = bool(getattr(settings, "clickhouse_enabled", False))
+
+    async def write_observations(
+        self,
+        rows: list[dict[str, Any]],
+        *,
+        tenant_id: str,
+    ) -> int:
+        if not self.enabled or not rows:
+            return 0
+
+        normalized: list[dict[str, Any]] = []
+        for row in rows:
+            position = row.get("position") or {}
+            lon = position.get("lon")
+            lat = position.get("lat")
+            if lon is None or lat is None:
+                log.warning(
+                    "clickhouse_observation_without_position tenant=%s source=%s entity=%s",
+                    tenant_id,
+                    row.get("source_id"),
+                    row.get("entity_id"),
+                )
+                continue
+
+            properties = {
+                "received_at": row.get("received_at"),
+                "speed_mps": row.get("speed_mps"),
+                "heading_deg": row.get("heading_deg"),
+                "confidence": row.get("confidence"),
+            }
+            normalized.append(
+                {
+                    "tenant_id": tenant_id,
+                    "source_id": str(row.get("source_id") or ""),
+                    "entity_id": str(row.get("entity_id") or ""),
+                    "entity_type": str(row.get("entity_type") or "unknown"),
+                    "observed_at": row.get("observed_at"),
+                    "lon": float(lon),
+                    "lat": float(lat),
+                    "alt_m": position.get("altitude_m"),
+                    "properties": json.dumps(
+                        properties,
+                        ensure_ascii=False,
+                        separators=(",", ":"),
+                        default=str,
+                    ),
+                }
+            )
+
+        if not normalized:
+            return 0
+
+        query = (
+            "INSERT INTO geoint.observations "
+            "(tenant_id, source_id, entity_id, entity_type, observed_at, "
+            "lon, lat, alt_m, properties) FORMAT JSONEachRow"
+        )
+        body = "\n".join(
+            json.dumps(row, ensure_ascii=False, separators=(",", ":"), default=str)
+            for row in normalized
+        )
+
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            response = await client.post(
+                f"{self.url}/",
+                params={"query": query, "date_time_input_format": "best_effort"},
+                content=body.encode("utf-8"),
+                headers={"Content-Type": "application/x-ndjson"},
+            )
+            response.raise_for_status()
+        return len(normalized)
 
 
 class ClickHouseClient:
