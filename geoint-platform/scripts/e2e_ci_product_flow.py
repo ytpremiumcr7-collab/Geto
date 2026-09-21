@@ -22,6 +22,7 @@ async def main() -> int:
     os.environ.setdefault("APP_ENV", "development")
     os.environ.setdefault("AUTH_DISABLED", "true")
 
+    from geoalchemy2.elements import WKTElement
     from httpx import ASGITransport, AsyncClient
     from sqlalchemy import select
 
@@ -30,6 +31,7 @@ async def main() -> int:
     from app.alerts.service import AlertService
     from app.db.session import SessionLocal
     from app.db.tenant import set_tenant
+    from app.geofencing.models import Geofence
     from app.main import app
 
     print("=== e2e_ci_product_flow ===")
@@ -68,6 +70,20 @@ async def main() -> int:
 
     async with SessionLocal() as session:
         await set_tenant(session, tenant)
+        fence = Geofence(
+            id=fence_id,
+            tenant_id=tenant,
+            name=f"e2e-fence-{fence_id}",
+            description="E2E alert fixture",
+            geometry=WKTElement(
+                "MULTIPOLYGON(((-99.20 19.30,-99.00 19.30,-99.00 19.50,-99.20 19.50,-99.20 19.30)))",
+                srid=4326,
+            ),
+            enabled=True,
+            metadata_={"fixture": "e2e_ci_product_flow"},
+        )
+        session.add(fence)
+
         ch = AlertChannel(
             id=channel_id,
             tenant_id=tenant,
