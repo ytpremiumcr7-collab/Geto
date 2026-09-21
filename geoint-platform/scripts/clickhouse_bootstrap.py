@@ -13,10 +13,18 @@ URL = os.environ.get("CLICKHOUSE_URL", "http://localhost:8123").rstrip("/")
 INIT = Path(__file__).resolve().parents[1] / "deploy" / "clickhouse" / "init.sql"
 
 
+def _statements(sql: str) -> list[str]:
+    # init.sql contains only simple statements. Strip comment-only lines before
+    # splitting so a leading comment cannot accidentally discard the statement
+    # that follows it in the same semicolon-delimited chunk.
+    uncommented = "\n".join(
+        line for line in sql.splitlines() if not line.lstrip().startswith("--")
+    )
+    return [statement.strip() for statement in uncommented.split(";") if statement.strip()]
+
+
 def main() -> int:
-    sql = INIT.read_text()
-    # Split on semicolons carefully — simple statements only
-    statements = [s.strip() for s in sql.split(";") if s.strip() and not s.strip().startswith("--")]
+    statements = _statements(INIT.read_text())
     with httpx.Client(timeout=30.0) as client:
         r = client.get(f"{URL}/ping")
         if r.status_code != 200:

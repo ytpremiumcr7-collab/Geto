@@ -2,11 +2,12 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
+from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
-from uuid import NAMESPACE_URL, uuid5
 
 import httpx
 
@@ -54,13 +55,34 @@ QUERY_TEMPLATES: dict[str, str] = {
 }
 
 
+def _observed_at_epoch_ms(value: Any) -> int:
+    if isinstance(value, datetime):
+        observed_at = value
+    else:
+        raw = str(value or "").strip()
+        if not raw:
+            raise ValueError("observed_at is required for analytics identity")
+        if raw.endswith("Z"):
+            raw = f"{raw[:-1]}+00:00"
+        observed_at = datetime.fromisoformat(raw)
+
+    if observed_at.tzinfo is None:
+        observed_at = observed_at.replace(tzinfo=UTC)
+    else:
+        observed_at = observed_at.astimezone(UTC)
+
+    epoch = datetime(1970, 1, 1, tzinfo=UTC)
+    delta = observed_at - epoch
+    return delta.days * 86_400_000 + delta.seconds * 1_000 + delta.microseconds // 1_000
+
+
 def observation_identity(tenant_id: str, row: dict[str, Any]) -> str:
-    """Stable logical identity matching the PostgreSQL observation uniqueness key."""
+    """Stable hash of the same fields as the PostgreSQL observation uniqueness key."""
     source_id = str(row.get("source_id") or "")
     entity_id = str(row.get("entity_id") or "")
-    observed_at = str(row.get("observed_at") or "")
-    material = f"geto-observation|{tenant_id}|{source_id}|{entity_id}|{observed_at}"
-    return str(uuid5(NAMESPACE_URL, material))
+    observed_at_ms = _observed_at_epoch_ms(row.get("observed_at"))
+    material = "\x1f".join((tenant_id, source_id, entity_id, str(observed_at_ms)))
+    return hashlib.sha256(material.encode("utf-8")).hexdigest().upper()
 
 
 class ClickHouseSink:
