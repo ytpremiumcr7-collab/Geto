@@ -40,6 +40,14 @@ from app.topography.providers import (
 from app.topography.repository import DemRepository
 
 
+def derived_object_key(tenant_id: str, category: str, filename: str) -> str:
+    """Build a tenant-scoped derived-object key with unambiguous path segments."""
+    parts = (tenant_id, category, filename)
+    if any(not part or part in {".", ".."} or "/" in part or "\\" in part for part in parts):
+        raise ValueError("unsafe derived object key component")
+    return f"derived/{tenant_id}/{category}/{filename}"
+
+
 class TopographyService:
     def __init__(self, session: AsyncSession | None = None):
         self.session = session
@@ -268,7 +276,7 @@ class TopographyService:
                 raise ValueError(f"Unknown operation: {operation}")
 
             # upload derived to MinIO
-            key = f"derived/{operation}/{dem_id}_{operation}.tif"
+            key = derived_object_key(tenant_id, operation, f"{dem_id}_{operation}.tif")
             uri = await self.store.put_bytes(
                 key,
                 Path(out_path).read_bytes(),
@@ -455,7 +463,11 @@ class TopographyService:
                 target_height_m,
                 max_distance_m,
             )
-            key = f"derived/viewshed/{dem_id}_{observer_lon}_{observer_lat}.tif"
+            key = derived_object_key(
+                tenant_id,
+                "viewshed",
+                f"{dem_id}_{observer_lon}_{observer_lat}.tif",
+            )
             uri = await self.store.put_bytes(
                 key,
                 Path(out_path).read_bytes(),
