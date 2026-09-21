@@ -88,18 +88,26 @@ class SourceWorker:
             max_deliver=self.max_deliver,
         )
 
-        while self._running:
-            try:
-                messages = await sub.fetch(batch=5, timeout=5)
-            except nats.errors.TimeoutError:
-                continue
-            except Exception:
-                log.exception("fetch_failed")
-                await asyncio.sleep(1)
-                continue
+        try:
+            while self._running:
+                try:
+                    messages = await sub.fetch(batch=5, timeout=5)
+                except nats.errors.TimeoutError:
+                    continue
+                except Exception:
+                    log.exception("fetch_failed")
+                    await asyncio.sleep(1)
+                    continue
 
-            for msg in messages:
-                await self.handle(msg)
+                for msg in messages:
+                    await self.handle(msg)
+        finally:
+            await self.dlq.close()
+            if self.nc is not None:
+                await self.nc.drain()
+            self.nc = None
+            self.js = None
+            log.info("worker_stopped")
 
     async def handle(self, msg: Msg) -> None:
         delivery = int(msg.metadata.num_delivered) if msg.metadata else 1
@@ -152,6 +160,10 @@ class SourceWorker:
                         job_id=str(job_id),
                         message_id=message_id,
                     )
+                # dispatcher commits its ingestion transaction. SET LOCAL RLS
+                # context is cleared by that commit, so job state must use a
+                # freshly tenant-bound transaction.
+                async with tenant_session(tenant_id) as session:
                     await self.jobs.mark_success(session, job_id)
                 async with system_worker_session() as session:
                     await self.idempotency.mark_completed(
