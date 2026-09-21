@@ -1,7 +1,7 @@
 """Idempotency claim state, source_runs RLS, source_jobs unique per tenant.
 
 Revision ID: 0012
-Revises: 0011
+Revises: 0011_alert_deliveries
 """
 
 from __future__ import annotations
@@ -10,7 +10,7 @@ from alembic import op
 import sqlalchemy as sa
 
 revision = "0012"
-down_revision = "0011"
+down_revision = "0011_alert_deliveries"
 branch_labels = None
 depends_on = None
 
