@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import maplibregl, { Map, Marker } from "maplibre-gl";
+import * as maplibregl from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import type { GeofenceRow, Observation, TrackPoint } from "@/api/client";
 import { fetchFirmsWms } from "@/api/client";
@@ -128,8 +128,8 @@ export function MapView({
   slopeOverlay = null,
 }: Props) {
   const container = useRef<HTMLDivElement>(null);
-  const mapRef = useRef<Map | null>(null);
-  const markersRef = useRef<Marker[]>([]);
+  const mapRef = useRef<maplibregl.Map | null>(null);
+  const markersRef = useRef<maplibregl.Marker[]>([]);
   const drawPts = useRef<[number, number][]>([]);
   const [pitch3d, setPitch3d] = useState(true);
   const [terrainOn, setTerrainOn] = useState(true);
