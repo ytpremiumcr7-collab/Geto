@@ -98,7 +98,12 @@ class GeofenceService:
                     "entity_id": entity_id,
                     "geofence_id": str(state.geofence_id),
                     "occurred_at": observed_at.isoformat(),
-                    "data": {"lat": lat, "lon": lon, "altitude": altitude, "entity_type": entity_type},
+                    "data": {
+                        "lat": lat,
+                        "lon": lon,
+                        "altitude": altitude,
+                        "entity_type": entity_type,
+                    },
                 }
                 events.append(event)
                 await outbox.enqueue(
