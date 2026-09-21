@@ -7,6 +7,9 @@ on:
       - "geoint-web/package.json"
       - ".github/workflows/frontend-lock-refresh.yml"
 
+permissions:
+  contents: write
+
 env:
   NODE_VERSION: "22"
 
@@ -16,6 +19,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: fix/geto-production-readiness-20260919
 
       - name: Setup Node
         uses: actions/setup-node@v4
@@ -30,9 +35,14 @@ jobs:
         working-directory: geoint-web
         run: npm audit --audit-level=moderate
 
-      - name: Upload generated lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: frontend-package-lock
-          path: geoint-web/package-lock.json
-          retention-days: 1
+      - name: Commit generated lock
+        run: |
+          if git diff --quiet -- geoint-web/package-lock.json; then
+            echo "package-lock.json already current"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add geoint-web/package-lock.json
+          git commit -m "chore: refresh frontend package lock"
+          git push origin HEAD:fix/geto-production-readiness-20260919
