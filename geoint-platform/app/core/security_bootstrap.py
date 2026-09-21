@@ -170,10 +170,7 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
     # Trusted hosts required in production (staging optional but recommended)
     th = (getattr(settings, "trusted_hosts", None) or "").strip()
     if settings.app_env in ("production", "prod") and not th:
-        errors.append(
-            "TRUSTED_HOSTS is required in production (comma-separated hostnames)"
-        )
-
+        errors.append("TRUSTED_HOSTS is required in production (comma-separated hostnames)")
 
 
         # Metrics should not be public

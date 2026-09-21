@@ -52,9 +52,7 @@ class OutboxDispatcher:
                         rows = payload.get("rows") or []
                         tenant_id = payload.get("tenant_id") or "default"
                         if rows:
-                            await ClickHouseSink().write_observations(
-                                rows, tenant_id=tenant_id
-                            )
+                            await ClickHouseSink().write_observations(rows, tenant_id=tenant_id)
                         await self.repo.mark_published(session, message)
                         log.info(
                             "clickhouse_outbox_written",

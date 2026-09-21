@@ -19,11 +19,7 @@ DEFAULT_TTL_S = 15 * 60  # 15 minutes
 
 
 def _secret() -> bytes:
-    raw = (
-        getattr(settings, "firms_tile_hmac_secret", None)
-        or settings.jwt_secret
-        or ""
-    ).strip()
+    raw = (getattr(settings, "firms_tile_hmac_secret", None) or settings.jwt_secret or "").strip()
     if not raw:
         # Deterministic lab fallback only when auth_disabled / empty secret —
         # production bootstrap should already require jwt material.

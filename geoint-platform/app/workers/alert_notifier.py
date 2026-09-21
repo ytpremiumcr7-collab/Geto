@@ -214,5 +214,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     import os
+
     os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     main()

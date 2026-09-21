@@ -87,6 +87,7 @@ class JobScheduler:
 
 async def main() -> None:
     import os
+
     os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     configure_logging(settings.log_level)
     from app.core.security_bootstrap import validate_settings

@@ -256,9 +256,7 @@ class IdempotencyRepository:
                 source_id=source_id,
                 status="completed",
             )
-.on_conflict_do_nothing(
-                constraint="uq_processed_messages_tenant_message_id"
-            )
+            .on_conflict_do_nothing(constraint="uq_processed_messages_tenant_message_id")
             .returning(ProcessedMessage.id)
         )
         result = await session.execute(stmt)

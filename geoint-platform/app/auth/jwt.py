@@ -134,6 +134,7 @@ class JWTService:
         tenant_id = payload.get(tenant_claim) or payload.get("tenant_id")
         if not tenant_id:
             from app.core.config import settings as _s
+
             if getattr(_s, "app_env", "development") in ("production", "prod", "staging"):
                 raise ValueError("JWT missing required tenant claim")
             tenant_id = "default"

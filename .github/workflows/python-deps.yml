@@ -51,6 +51,11 @@ jobs:
           pip install --no-deps -e .
 
       - name: Smoke import
+        env:
+          APP_ENV: test
+          DATABASE_URL: postgresql+asyncpg://ci:ci@localhost:5432/ci
+          MINIO_ACCESS_KEY: ci-access
+          MINIO_SECRET_KEY: ci-secret-not-for-runtime
         run: |
           python -c "import app; from app.main import app as fastapi_app; print('ok', fastapi_app.title)"
           ruff --version

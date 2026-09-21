@@ -223,6 +223,7 @@ class SourceWorker:
 
 async def main() -> None:
     import os
+
     os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     import signal
 
