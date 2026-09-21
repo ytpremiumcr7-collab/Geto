@@ -10,7 +10,7 @@ import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
-from xml.etree import ElementTree
+from defusedxml import ElementTree
 
 import httpx
 
