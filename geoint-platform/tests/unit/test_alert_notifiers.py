@@ -58,7 +58,13 @@ def test_webhook_success_and_signature():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("app.alerts.notifiers.httpx.AsyncClient", return_value=mock_client):
+    with (
+        patch(
+            "app.alerts.ssrf.validate_webhook_url",
+            return_value="https://hooks.example.com/geoint",
+        ),
+        patch("app.alerts.notifiers.httpx.AsyncClient", return_value=mock_client),
+    ):
         r = asyncio.run(
             WebhookNotifier().send(
                 alert=alert,
