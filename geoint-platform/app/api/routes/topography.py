@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.dependencies import get_current_principal, get_tenant_db
 from app.auth.models import Principal
-from app.db.session import get_db  # noqa: F401 — legacy
 from app.topography.models import (
     DemAssetCreate,
     DemProvider,
