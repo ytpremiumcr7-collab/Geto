@@ -8,6 +8,7 @@ from typing import Any
 from uuid import UUID
 
 import nats
+from nats.aio.client import Client as NATSClient
 from nats.js import JetStreamContext
 from nats.js.api import RetentionPolicy, StorageType, StreamConfig
 
@@ -18,12 +19,13 @@ from app.messaging.subjects import DLQ_PREFIX, JOBS_PREFIX
 class JetStreamClient:
     def __init__(self, url: str | None = None):
         self.url = url or settings.nats_url
-        self.nc = None
+        self.nc: NATSClient | None = None
         self.js: JetStreamContext | None = None
 
     async def connect(self) -> None:
-        self.nc = await nats.connect(self.url, name="geoint-js")
-        self.js = self.nc.jetstream()
+        nc = await nats.connect(self.url, name="geoint-js")
+        self.nc = nc
+        self.js = nc.jetstream()
         await self.ensure_streams()
 
     async def ensure_streams(self) -> None:

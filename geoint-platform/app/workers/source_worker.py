@@ -9,7 +9,9 @@ from uuid import UUID
 
 import nats
 import structlog
+from nats.aio.client import Client as NATSClient
 from nats.aio.msg import Msg
+from nats.js import JetStreamContext
 from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
 
 from app.core.config import settings
@@ -31,8 +33,8 @@ class SourceWorker:
         self.queue = os.getenv("NATS_QUEUE_GROUP", "geoint-workers")
         self.ack_wait = int(os.getenv("NATS_ACK_WAIT_SECONDS", "60"))
         self.max_deliver = int(os.getenv("NATS_MAX_DELIVER", "5"))
-        self.nc = None
-        self.js = None
+        self.nc: NATSClient | None = None
+        self.js: JetStreamContext | None = None
         self.dispatcher = SourceDispatcher()
         self.jobs = JobRepository()
         self.idempotency = IdempotencyRepository()
@@ -40,17 +42,19 @@ class SourceWorker:
         self._running = True
 
     async def start(self) -> None:
-        self.nc = await nats.connect(self.nats_url, name="geoint-source-worker")
-        self.js = self.nc.jetstream()
+        nc = await nats.connect(self.nats_url, name="geoint-source-worker")
+        js = nc.jetstream()
+        self.nc = nc
+        self.js = js
         await self.dlq.connect()
 
         # Asegurar stream de jobs (idempotente)
         try:
-            await self.js.stream_info(settings.nats_stream)
+            await js.stream_info(settings.nats_stream)
         except Exception:
             from nats.js.api import RetentionPolicy, StorageType, StreamConfig
 
-            await self.js.add_stream(
+            await js.add_stream(
                 StreamConfig(
                     name=settings.nats_stream,
                     subjects=[f"{JOBS_PREFIX}.>", "geoint.observation.>", "geoint.event.>"],
@@ -70,7 +74,7 @@ class SourceWorker:
             filter_subject=f"{JOBS_PREFIX}.>",
         )
 
-        sub = await self.js.pull_subscribe(
+        sub = await js.pull_subscribe(
             subject=f"{JOBS_PREFIX}.>",
             durable=self.durable,
             config=config,

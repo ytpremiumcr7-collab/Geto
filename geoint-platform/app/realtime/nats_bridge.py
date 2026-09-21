@@ -10,6 +10,7 @@ import json
 
 import nats
 import structlog
+from nats.aio.client import Client as NATSClient
 
 from app.core.config import settings
 from app.realtime.manager import manager
@@ -19,17 +20,16 @@ log = structlog.get_logger()
 
 class RealtimeNatsBridge:
     def __init__(self) -> None:
-        self.nc = None
-        self.js = None
+        self.nc: NATSClient | None = None
         self._running = False
 
     async def start(self) -> None:
-        self.nc = await nats.connect(settings.nats_url, name="geoint-realtime-api")
-        self.js = self.nc.jetstream()
+        nc = await nats.connect(settings.nats_url, name="geoint-realtime-api")
+        self.nc = nc
         self._running = True
 
         # Stream de eventos ya asegurado por JetStreamClient; suscripción push simple
-        sub = await self.nc.subscribe("geoint.event.>")
+        sub = await nc.subscribe("geoint.event.>")
         log.info("realtime_bridge_subscribed", subject="geoint.event.>")
 
         while self._running:
