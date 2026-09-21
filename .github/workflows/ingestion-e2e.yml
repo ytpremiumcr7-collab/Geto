@@ -1,0 +1,96 @@
+name: Ingestion pipeline E2E
+
+on:
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.12"
+  DATABASE_URL: postgresql+asyncpg://geoint:geoint_ci_ingestion@localhost:5432/geoint
+  NATS_URL: nats://localhost:4222
+  MINIO_ENDPOINT: localhost:9000
+  MINIO_ACCESS_KEY: ciaccesskey12
+  MINIO_SECRET_KEY: cisecretkey123456
+  MINIO_SECURE: "false"
+  MINIO_CREATE_BUCKET: "true"
+  APP_ENV: test
+  AUTH_DISABLED: "true"
+  JWT_SECRET: ci-ingestion-jwt-secret-32bytes-minimum
+  CLICKHOUSE_ENABLED: "false"
+  GEOINT_SYSTEM_WORKER: "1"
+
+jobs:
+  ingestion-e2e:
+    name: Scheduler -> NATS -> worker -> ingestion
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgis/postgis:16-3.4
+        env:
+          POSTGRES_USER: geoint
+          POSTGRES_PASSWORD: geoint_ci_ingestion
+          POSTGRES_DB: geoint
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U geoint -d geoint"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: geoint-platform/requirements.lock.txt
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libgdal-dev gdal-bin
+
+      - name: Install locked Python dependencies
+        working-directory: geoint-platform
+        run: |
+          python -m pip install --upgrade pip
+          pip install --require-hashes -r requirements.lock.txt
+          pip install --no-deps -e .
+
+      - name: Start NATS JetStream and MinIO
+        run: |
+          docker run -d --name geoint-nats-ci -p 4222:4222 -p 8222:8222 nats:2.10-alpine -js -m 8222
+          docker run -d --name geoint-minio-ci -p 9000:9000 \
+            -e MINIO_ROOT_USER=ciaccesskey12 \
+            -e MINIO_ROOT_PASSWORD=cisecretkey123456 \
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data --console-address ":9001"
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:8222/healthz >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8222/healthz >/dev/null
+          for i in {1..30}; do
+            curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null && break
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:9000/minio/health/live >/dev/null
+
+      - name: Apply migrations
+        working-directory: geoint-platform
+        run: alembic upgrade head
+
+      - name: Run real ingestion pipeline
+        working-directory: geoint-platform
+        run: python scripts/e2e_ingestion_pipeline.py
+
+      - name: Service logs on failure
+        if: failure()
+        run: |
+          docker logs geoint-nats-ci || true
+          docker logs geoint-minio-ci || true
+
+      - name: Stop NATS and MinIO
+        if: always()
+        run: docker rm -f geoint-nats-ci geoint-minio-ci || true
