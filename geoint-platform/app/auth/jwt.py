@@ -98,14 +98,13 @@ class JWTService:
     def _decode_hs256(self, token: str) -> Principal:
         # P0: never verify with weak/default secrets (forged admin tokens)
         secret = _assert_hs256_secret_usable(self.secret)
-        options = {"require": ["exp", "sub"]}
         payload = jwt.decode(
             token,
             secret,
             algorithms=[self.algorithm],
             audience=self.audience,
             issuer=self.issuer,
-            options=options,
+            options={"require": ["exp", "sub"]},
         )
         return self._principal_from_payload(payload)
 

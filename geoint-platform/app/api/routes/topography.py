@@ -184,16 +184,16 @@ async def slope_preview(
         bbox = [west, south, east, north]  # type: ignore
     try:
         result = await svc.slope_preview(principal.tenant_id, dem_id, bbox)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
-    w, s, e, n = result["bounds"]
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    west_bound, south_bound, east_bound, north_bound = result["bounds"]
     headers = {
-        "X-Bounds-West": str(w),
-        "X-Bounds-South": str(s),
-        "X-Bounds-East": str(e),
-        "X-Bounds-North": str(n),
+        "X-Bounds-West": str(west_bound),
+        "X-Bounds-South": str(south_bound),
+        "X-Bounds-East": str(east_bound),
+        "X-Bounds-North": str(north_bound),
         "X-Slope-Min": str(result["stats"]["slope_min"]),
         "X-Slope-Max": str(result["stats"]["slope_max"]),
         "X-Slope-Mean": str(result["stats"]["slope_mean"]),
