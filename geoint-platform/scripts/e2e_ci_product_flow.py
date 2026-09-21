@@ -134,9 +134,23 @@ async def main() -> int:
         )
         deliveries = list(result.scalars().all())
         assert deliveries, "expected deliveries"
-        d = deliveries[-1]
-        d.status = "sending"
-        out = await DeliveryService().process_one(session, d)
+
+        delivery_service = DeliveryService()
+        worker_id = "e2e-product-worker"
+        claimed = await delivery_service.claim_batch(
+            session,
+            worker_id=worker_id,
+            limit=20,
+        )
+        assert claimed, "expected a claimable delivery"
+        d = next((item for item in claimed if item.id == deliveries[-1].id), None)
+        assert d is not None, "expected emitted alert delivery to be claimed"
+
+        out = await delivery_service.process_one(
+            session,
+            delivery_id=d.id,
+            worker_id=worker_id,
+        )
         await session.commit()
         status = out.get("status") if isinstance(out, dict) else out
         assert status == "delivered" or d.status == "delivered", (status, d.status)
