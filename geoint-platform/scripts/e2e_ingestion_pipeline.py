@@ -18,7 +18,6 @@ from app.db.session import engine
 from app.db.tenant import system_worker_session, tenant_session
 from app.infrastructure.object_store import ObjectStore
 from app.jobs.models import ProcessedMessage, SourceJob
-from app.messaging.jetstream import JetStreamClient
 from app.outbox.models import OutboxMessage
 from app.workers.job_scheduler import JobScheduler
 from app.workers.source_worker import SourceWorker
