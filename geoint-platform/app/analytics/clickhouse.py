@@ -5,8 +5,8 @@ from __future__ import annotations
 import json
 import logging
 from typing import Any
-from uuid import NAMESPACE_URL, uuid5
 from urllib.parse import urlencode
+from uuid import NAMESPACE_URL, uuid5
 
 import httpx
 
