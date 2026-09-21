@@ -56,8 +56,8 @@ class JPLHorizonsAdapter(SourceAdapter):
         start: str | None = None,
         stop: str | None = None,
         step: str = "1d",
-            **kwargs: Any,
-) -> Any:
+        **kwargs: Any,
+    ) -> Any:
         """command: id Horizons, p.ej. '399' Tierra, '301' Luna, '199' Mercurio."""
         self._reject_unexpected_fetch_kwargs(kwargs)
         cmd = command or getattr(settings, "horizons_default_command", "399")
