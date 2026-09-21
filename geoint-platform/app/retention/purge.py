@@ -23,11 +23,7 @@ async def purge_observations() -> int:
         return 0
     cutoff = datetime.now(UTC) - timedelta(days=days)
     async with system_worker_session() as session:
-        stmt = (
-            delete(Observation)
-            .where(Observation.observed_at < cutoff)
-            .returning(Observation.id)
-        )
+        stmt = delete(Observation).where(Observation.observed_at < cutoff).returning(Observation.id)
         result = await session.execute(stmt)
         count = len(result.scalars().all())
         await session.commit()
