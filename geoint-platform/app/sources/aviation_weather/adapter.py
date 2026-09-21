@@ -43,7 +43,9 @@ class AviationWeatherAdapter(SourceAdapter):
     async def fetch(
         self,
         station_ids: str = "KMCI",
-    ) -> Any:
+            **kwargs: Any,
+) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         async with httpx.AsyncClient(
             timeout=30,
             headers={"User-Agent": settings.aviation_weather_user_agent},

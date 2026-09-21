@@ -33,10 +33,16 @@ class SourceAdapter(ABC):
     async def fetch(self, **kwargs) -> Any:
         pass
 
+    @staticmethod
+    def _reject_unexpected_fetch_kwargs(kwargs: dict[str, Any]) -> None:
+        if kwargs:
+            names = ", ".join(sorted(kwargs))
+            raise TypeError(f"unexpected fetch keyword argument(s): {names}")
+
     @abstractmethod
-    async def normalize(
+    def normalize(
         self,
         raw_data: Any,
         received_at: datetime,
     ) -> AsyncIterator[Observation]:
-        pass
+        raise NotImplementedError

@@ -63,8 +63,10 @@ class NEXRADAdapter(SourceAdapter):
         self,
         site: str | None = None,
         max_keys: int = 20,
-    ) -> Any:
+            **kwargs: Any,
+) -> Any:
         """Lista claves S3 recientes para un sitio (default KTLX o settings)."""
+        self._reject_unexpected_fetch_kwargs(kwargs)
         site = (site or getattr(settings, "nexrad_default_site", "KTLX")).upper()
         now = datetime.now(UTC)
         # Prefijo típico: YYYY/MM/DD/SITE

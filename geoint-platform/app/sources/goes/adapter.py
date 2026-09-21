@@ -51,7 +51,9 @@ class GOESAdapter(SourceAdapter):
         self,
         product: str | None = None,
         max_keys: int = 15,
-    ) -> Any:
+            **kwargs: Any,
+) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         product = product or self.product
         now = datetime.now(UTC)
         # Prefijo ABI: Product/year/doy/hour/

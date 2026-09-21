@@ -29,7 +29,8 @@ class USGSEarthquakeAdapter(SourceAdapter):
         except Exception:
             return False
 
-    async def fetch(self) -> Any:
+    async def fetch(self, **kwargs: Any) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         async with httpx.AsyncClient(timeout=20) as client:
             response = await client.get(settings.usgs_url)
             response.raise_for_status()

@@ -42,7 +42,8 @@ class ReadsbLocalAdapter(SourceAdapter):
     async def health(self) -> bool:
         return self.path.is_file()
 
-    async def fetch(self, path: str | None = None) -> Any:
+    async def fetch(self, path: str | None = None, **kwargs: Any) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         target = Path(path) if path else self.path
         if not target.is_file():
             raise FileNotFoundError(f"readsb aircraft.json not found: {target}")
