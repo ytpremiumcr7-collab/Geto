@@ -13,6 +13,7 @@ import json
 import os
 import signal
 import socket
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -29,7 +30,10 @@ from app.db.tenant import system_worker_session, tenant_session
 log = structlog.get_logger()
 
 HEARTBEAT_PATH = Path(
-    os.getenv("ALERT_NOTIFIER_HEARTBEAT_PATH", "/tmp/geoint_alert_notifier_heartbeat")
+    os.getenv(
+        "ALERT_NOTIFIER_HEARTBEAT_PATH",
+        str(Path(tempfile.gettempdir()) / "geoint_alert_notifier_heartbeat"),
+    )
 )
 
 
@@ -41,6 +45,7 @@ class AlertNotifierWorker:
         self.batch = int(
             os.getenv("ALERT_NOTIFIER_BATCH_SIZE") or settings.alert_notifier_batch_size
         )
+        self.health_host = os.getenv("ALERT_NOTIFIER_HEALTH_HOST", "127.0.0.1")
         self.health_port = int(os.getenv("ALERT_NOTIFIER_HEALTH_PORT", "8081"))
         self.lease_seconds = int(
             os.getenv("ALERT_NOTIFIER_LEASE_SECONDS") or settings.alert_notifier_lease_seconds
@@ -119,8 +124,12 @@ class AlertNotifierWorker:
                 pass
 
     async def _run_health_server(self) -> None:
-        server = await asyncio.start_server(self._handle_health, "0.0.0.0", self.health_port)
-        log.info("alert_notifier_health_listen", port=self.health_port)
+        server = await asyncio.start_server(
+            self._handle_health,
+            self.health_host,
+            self.health_port,
+        )
+        log.info("alert_notifier_health_listen", host=self.health_host, port=self.health_port)
         async with server:
             await server.serve_forever()
 
