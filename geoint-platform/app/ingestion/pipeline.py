@@ -47,7 +47,7 @@ class IngestionPipeline:
 
             raw_key = self.object_store.make_key(source_id)
 
-            raw_uri = self.object_store.put_json(
+            raw_uri = await self.object_store.put_json(
                 raw_key,
                 raw,
             )

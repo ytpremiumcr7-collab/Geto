@@ -273,6 +273,7 @@ class SourceDispatcher:
             .on_conflict_do_nothing(
                 constraint="uq_observations_tenant_source_entity_time",
             )
+            .returning(ObservationModel.id)
         )
         result = await session.execute(stmt)
-        return (result.rowcount or 0) > 0
+        return result.scalar_one_or_none() is not None
