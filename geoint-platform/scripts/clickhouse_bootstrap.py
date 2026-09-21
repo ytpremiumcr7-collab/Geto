@@ -17,9 +17,7 @@ def _statements(sql: str) -> list[str]:
     # init.sql contains only simple statements. Strip comment-only lines before
     # splitting so a leading comment cannot accidentally discard the statement
     # that follows it in the same semicolon-delimited chunk.
-    uncommented = "\n".join(
-        line for line in sql.splitlines() if not line.lstrip().startswith("--")
-    )
+    uncommented = "\n".join(line for line in sql.splitlines() if not line.lstrip().startswith("--"))
     return [statement.strip() for statement in uncommented.split(";") if statement.strip()]
 
 

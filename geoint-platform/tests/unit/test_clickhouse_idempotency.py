@@ -22,9 +22,7 @@ def test_analytics_queries_count_logical_observations():
 
 
 def test_clickhouse_schema_upgrades_existing_tables_with_same_identity_material():
-    sql = (
-        Path(__file__).resolve().parents[2] / "deploy" / "clickhouse" / "init.sql"
-    ).read_text()
+    sql = (Path(__file__).resolve().parents[2] / "deploy" / "clickhouse" / "init.sql").read_text()
     assert "ADD COLUMN IF NOT EXISTS observation_id String DEFAULT" in sql
     assert "toUnixTimestamp64Milli(observed_at)" in sql
     assert "hex(SHA256(concat(" in sql
