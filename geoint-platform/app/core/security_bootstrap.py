@@ -160,25 +160,24 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
         if getattr(settings, "rate_limit_fail_open", False):
             errors.append("RATE_LIMIT_FAIL_OPEN must be false in production/staging")
 
-    # Legacy plaintext API keys forbidden outside development
-    if getattr(settings, "api_keys", None) and str(settings.api_keys).strip():
-        errors.append(
-            "API_KEYS (plaintext) is forbidden when APP_ENV is production|staging; "
-            "use API_KEY_HASHES only"
-        )
+    if env in _PROD_ENVS:
+        # Legacy plaintext API keys are forbidden outside development/test.
+        if getattr(settings, "api_keys", None) and str(settings.api_keys).strip():
+            errors.append(
+                "API_KEYS (plaintext) is forbidden when APP_ENV is production|staging; "
+                "use API_KEY_HASHES only"
+            )
 
-    # Trusted hosts required in production (staging optional but recommended)
-    th = (getattr(settings, "trusted_hosts", None) or "").strip()
-    if settings.app_env in ("production", "prod") and not th:
-        errors.append("TRUSTED_HOSTS is required in production (comma-separated hostnames)")
+        # Trusted hosts are mandatory in production; staging may run behind an
+        # ephemeral hostname but should still set this when the hostname is stable.
+        th = (getattr(settings, "trusted_hosts", None) or "").strip()
+        if env in ("production", "prod") and not th:
+            errors.append("TRUSTED_HOSTS is required in production (comma-separated hostnames)")
 
-
-        # Metrics should not be public
         if getattr(settings, "metrics_public", False):
             warnings.append("METRICS_PUBLIC=true exposes /metrics without auth")
-
     else:
-        # Dev soft checks
+        # Dev/test soft checks
         if settings.jwt_secret and _is_forbidden(settings.jwt_secret):
             warnings.append(
                 "JWT_SECRET is empty or a known-weak default; encode/decode will reject it"
