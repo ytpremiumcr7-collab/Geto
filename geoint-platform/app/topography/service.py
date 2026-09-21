@@ -621,8 +621,10 @@ class TopographyService:
 
     @staticmethod
     def _cleanup_temp(path: str, original_uri: str) -> None:
-        if original_uri.startswith("s3://") and path.startswith("/tmp"):
+        candidate = Path(path).resolve()
+        temp_root = Path(tempfile.gettempdir()).resolve()
+        if original_uri.startswith("s3://") and candidate.parent == temp_root:
             try:
-                os.unlink(path)
+                candidate.unlink()
             except OSError:
                 pass
