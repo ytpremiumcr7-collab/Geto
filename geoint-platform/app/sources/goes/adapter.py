@@ -10,9 +10,9 @@ import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
-from defusedxml import ElementTree
 
 import httpx
+from defusedxml import ElementTree
 
 from app.core.config import settings
 from app.domain.models import Observation
