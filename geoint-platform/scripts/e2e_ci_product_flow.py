@@ -76,13 +76,19 @@ async def main() -> int:
             name=f"e2e-fence-{fence_id}",
             description="E2E alert fixture",
             geometry=WKTElement(
-                "MULTIPOLYGON(((-99.20 19.30,-99.00 19.30,-99.00 19.50,-99.20 19.50,-99.20 19.30)))",
+                "MULTIPOLYGON((("
+                "-99.20 19.30,-99.00 19.30,-99.00 19.50,"
+                "-99.20 19.50,-99.20 19.30"
+                ")))",
                 srid=4326,
             ),
             enabled=True,
             metadata_={"fixture": "e2e_ci_product_flow"},
         )
         session.add(fence)
+        # GeofenceAlertRule has a DB-level composite FK that is not declared in ORM metadata.
+        # Flush explicitly so the referenced (tenant_id, geofence_id) exists before the rule.
+        await session.flush()
 
         ch = AlertChannel(
             id=channel_id,
