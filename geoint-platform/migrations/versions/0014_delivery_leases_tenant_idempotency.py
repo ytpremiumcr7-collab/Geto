@@ -15,7 +15,19 @@ branch_labels = None
 depends_on = None
 
 
+def _set_system_worker_context() -> None:
+    # 0013 FORCEs RLS on both source_jobs and processed_messages. Alembic data
+    # backfills must therefore establish the same dual system-worker claim used
+    # by runtime workers before reading or mutating those tables.
+    op.execute(
+        "SELECT set_config('app.tenant_id', '__system__', true), "
+        "set_config('app.worker_mode', '1', true)"
+    )
+
+
 def upgrade() -> None:
+    _set_system_worker_context()
+
     # processed_messages: preserve tenant attribution where Nats-Msg-Id == source_job UUID.
     op.add_column(
         "processed_messages",
@@ -79,6 +91,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
+    _set_system_worker_context()
+
     op.drop_index("ix_alert_deliveries_lease", table_name="alert_deliveries")
     op.drop_column("alert_deliveries", "lease_until")
     op.drop_column("alert_deliveries", "claimed_by")
