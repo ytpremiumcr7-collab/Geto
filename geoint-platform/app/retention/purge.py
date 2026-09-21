@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import os
 from datetime import UTC, datetime, timedelta
 
 import structlog
@@ -48,6 +49,7 @@ async def run_once() -> None:
 
 
 async def main() -> None:
+    os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     configure_logging(settings.log_level)
     interval = max(3600, int(getattr(settings, "purge_interval_seconds", 86400) or 86400))
     while True:
