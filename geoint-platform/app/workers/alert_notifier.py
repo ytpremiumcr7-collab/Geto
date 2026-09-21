@@ -36,17 +36,14 @@ HEARTBEAT_PATH = Path(
 class AlertNotifierWorker:
     def __init__(self) -> None:
         self.poll = float(
-            os.getenv("ALERT_NOTIFIER_POLL_SECONDS")
-            or settings.alert_notifier_poll_seconds
+            os.getenv("ALERT_NOTIFIER_POLL_SECONDS") or settings.alert_notifier_poll_seconds
         )
         self.batch = int(
-            os.getenv("ALERT_NOTIFIER_BATCH_SIZE")
-            or settings.alert_notifier_batch_size
+            os.getenv("ALERT_NOTIFIER_BATCH_SIZE") or settings.alert_notifier_batch_size
         )
         self.health_port = int(os.getenv("ALERT_NOTIFIER_HEALTH_PORT", "8081"))
         self.lease_seconds = int(
-            os.getenv("ALERT_NOTIFIER_LEASE_SECONDS")
-            or settings.alert_notifier_lease_seconds
+            os.getenv("ALERT_NOTIFIER_LEASE_SECONDS") or settings.alert_notifier_lease_seconds
         )
         self.worker_id = os.getenv("ALERT_NOTIFIER_WORKER_ID") or (
             f"{socket.gethostname()}-{os.getpid()}-{uuid4().hex[:8]}"
