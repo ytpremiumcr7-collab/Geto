@@ -67,7 +67,10 @@ async def oidc_status():
 @router.get("/oidc/start")
 async def oidc_start(return_to: str = Query("/", max_length=512)):
     if not settings.auth_cookie_mode:
-        raise HTTPException(\n            status_code=503,\n            detail="OIDC browser login requires AUTH_COOKIE_MODE=true",\n        )
+        raise HTTPException(
+            status_code=503,
+            detail="OIDC browser login requires AUTH_COOKIE_MODE=true",
+        )
     try:
         url = await OIDCService().authorization_url(return_to=return_to)
     except OIDCConfigurationError as exc:
