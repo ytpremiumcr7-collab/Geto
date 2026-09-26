@@ -5,9 +5,9 @@ from types import SimpleNamespace
 
 import pytest
 
-from app.auth.models import Principal
 from app.api.routes import entities as entities_routes
 from app.api.routes import observations as observations_routes
+from app.auth.models import Principal
 
 
 def _row(source_id: str, entity_id: str = "icao24:abc"):
