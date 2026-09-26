@@ -59,7 +59,7 @@ async def _seed_job(path: str) -> UUID:
     return job.id
 
 
-async def _wait_pipeline(job_id: UUID, timeout: float = 30.0):
+async def _wait_pipeline(job_id: UUID, *, min_runs: int = 1, timeout: float = 30.0):
     deadline = asyncio.get_running_loop().time() + timeout
     last_state: tuple[str | None, bool, int] | None = None
     while asyncio.get_running_loop().time() < deadline:
@@ -105,7 +105,7 @@ async def _wait_pipeline(job_id: UUID, timeout: float = 30.0):
             and job.status == "pending"
             and job.last_success_at is not None
             and observation is not None
-            and runs
+            and len(runs) >= min_runs
             and runs[-1].status == "ok"
             and outbox is not None
         ):
@@ -148,7 +148,8 @@ async def main() -> int:
         job_id = await _seed_job(str(fixture_path))
         await scheduler.tick()
 
-        job, observation, run, outbox = await _wait_pipeline(job_id)
+        job, observation, run, outbox = await _wait_pipeline(job_id, min_runs=1)
+        first_success_at = job.last_success_at
 
         assert observation.raw_payload_uri is not None
         prefix = f"s3://{settings.minio_bucket_raw}/raw/{TENANT_ID}/readsb_local/"
@@ -160,16 +161,21 @@ async def main() -> int:
         assert raw["aircraft"][0]["hex"] == HEX_ID
 
         async with system_worker_session() as session:
-            processed = (
-                await session.execute(
-                    select(ProcessedMessage).where(
-                        ProcessedMessage.tenant_id == TENANT_ID,
-                        ProcessedMessage.message_id == str(job_id),
+            processed_rows = list(
+                (
+                    await session.execute(
+                        select(ProcessedMessage).where(
+                            ProcessedMessage.tenant_id == TENANT_ID,
+                            ProcessedMessage.source_id == "readsb_local",
+                        )
                     )
-                )
-            ).scalar_one_or_none()
-        assert processed is not None
-        assert processed.status == "completed"
+                ).scalars().all()
+            )
+        assert len(processed_rows) == 1
+        assert processed_rows[0].status == "completed"
+        assert processed_rows[0].message_id != str(job_id), (
+            "execution message identity must not reuse the permanent SourceJob id"
+        )
 
         assert job.attempts == 0
         assert job.locked_until is None
@@ -178,6 +184,39 @@ async def main() -> int:
         assert run.records_normalized == 1
         assert outbox.payload["inserted"] == 1
 
+        # Force the same recurring schedule due again and change source time so
+        # the second run must produce a second logical observation.
+        fixture["now"] += 60
+        fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
+        async with tenant_session(TENANT_ID) as session:
+            recurring = await session.get(SourceJob, job_id)
+            assert recurring is not None
+            recurring.next_run_at = datetime.now(UTC) - timedelta(seconds=1)
+            await session.commit()
+
+        await scheduler.tick()
+        job2, observation2, run2, _ = await _wait_pipeline(job_id, min_runs=2)
+        assert job2.last_success_at is not None
+        assert first_success_at is not None
+        assert job2.last_success_at > first_success_at
+        assert run2.status == "ok"
+        assert observation2 is not None
+
+        async with system_worker_session() as session:
+            processed_rows = list(
+                (
+                    await session.execute(
+                        select(ProcessedMessage).where(
+                            ProcessedMessage.tenant_id == TENANT_ID,
+                            ProcessedMessage.source_id == "readsb_local",
+                        )
+                    )
+                ).scalars().all()
+            )
+        assert len(processed_rows) == 2
+        assert len({row.message_id for row in processed_rows}) == 2
+        assert all(row.status == "completed" for row in processed_rows)
+
         print(
             "INGESTION_E2E_OK",
             {
@@ -185,7 +224,7 @@ async def main() -> int:
                 "job_id": str(job_id),
                 "entity_id": observation.entity_id,
                 "raw_uri": observation.raw_payload_uri,
-                "processed": processed.status,
+                "executions": len(processed_rows),
             },
         )
         return 0
