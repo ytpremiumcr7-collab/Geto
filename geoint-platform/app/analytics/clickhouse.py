@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+from collections.abc import Collection
 import json
 import logging
 from datetime import UTC, datetime
@@ -22,6 +23,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
+          AND has(splitByChar(',', {allowed_sources:String}), source_id)
         GROUP BY source_id
         ORDER BY n DESC
         LIMIT 50
@@ -31,6 +33,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
+          AND has(splitByChar(',', {allowed_sources:String}), source_id)
         GROUP BY hour
         ORDER BY hour
     """,
@@ -39,6 +42,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
+          AND has(splitByChar(',', {allowed_sources:String}), source_id)
         GROUP BY entity_type
         ORDER BY n DESC
         LIMIT 30
@@ -48,6 +52,7 @@ QUERY_TEMPLATES: dict[str, str] = {
         FROM geoint.observations
         WHERE tenant_id = {tenant:String}
           AND observed_at >= now() - INTERVAL 24 HOUR
+          AND has(splitByChar(',', {allowed_sources:String}), source_id)
         GROUP BY entity_id, entity_type
         ORDER BY n DESC
         LIMIT 25
@@ -190,6 +195,7 @@ class ClickHouseClient:
         *,
         tenant_id: str,
         params: dict[str, Any] | None = None,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> dict[str, Any]:
         if not self.enabled:
             return {
@@ -203,10 +209,21 @@ class ClickHouseClient:
             allowed = sorted(QUERY_TEMPLATES)
             raise ValueError(f"Unknown template_id: {template_id}. Allowed: {allowed}")
 
-        # Parameterized via ClickHouse HTTP query params
+        readable_sources = sorted({str(item) for item in (allowed_source_ids or []) if str(item)})
+        if not readable_sources:
+            return {
+                "enabled": True,
+                "template_id": template_id,
+                "rows": [],
+                "authorized_sources": 0,
+            }
+
+        # Parameterized via ClickHouse HTTP query params. Source ids come from
+        # the backend policy registry, never from client-supplied SQL.
         q_params = {
             "default_format": "JSON",
             "param_tenant": tenant_id,
+            "param_allowed_sources": ",".join(readable_sources),
         }
         if params:
             for k, v in params.items():
