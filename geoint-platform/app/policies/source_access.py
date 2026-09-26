@@ -224,6 +224,18 @@ def can_read_source(principal: Principal, source_id: str) -> bool:
     return False
 
 
+def readable_source_ids(principal: Principal) -> frozenset[str]:
+    """Return the exact source universe this principal may read.
+
+    Unknown/unregistered sources are intentionally excluded. Callers should pass
+    this set into data queries even when the client did not request a source so
+    "all sources" can never become an authorization bypass.
+    """
+    return frozenset(
+        source_id for source_id in SOURCE_POLICIES if can_read_source(principal, source_id)
+    )
+
+
 def can_admin_source(principal: Principal, source_id: str) -> bool:
     policy = SOURCE_POLICIES.get(source_id)
     if policy is None:
