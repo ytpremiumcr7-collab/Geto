@@ -151,6 +151,22 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
                 elif not o.startswith("https://"):
                     errors.append(f"CORS origin must be https://… in production: {o}")
 
+        # Browser product auth is a BFF OIDC Authorization Code + PKCE flow.
+        # Production must not fall back to the bootstrap role form or expose the
+        # IdP token to browser storage.
+        oidc_client_id = (getattr(settings, "oidc_client_id", None) or "").strip()
+        oidc_redirect_uri = (getattr(settings, "oidc_redirect_uri", None) or "").strip()
+        if not oidc_client_id:
+            errors.append("OIDC_CLIENT_ID is required in production/staging for browser login")
+        if not oidc_redirect_uri:
+            errors.append("OIDC_REDIRECT_URI is required in production/staging for browser login")
+        elif not oidc_redirect_uri.startswith("https://"):
+            errors.append("OIDC_REDIRECT_URI must use https:// in production/staging")
+        if not getattr(settings, "auth_cookie_mode", False):
+            errors.append("AUTH_COOKIE_MODE=true is required in production/staging browser login")
+        if not getattr(settings, "auth_cookie_secure", False):
+            errors.append("AUTH_COOKIE_SECURE=true is required in production/staging")
+
         # Bootstrap token issuance should not be open without secret
         bootstrap = getattr(settings, "auth_bootstrap_secret", None) or ""
         if bootstrap and _is_forbidden(bootstrap):
