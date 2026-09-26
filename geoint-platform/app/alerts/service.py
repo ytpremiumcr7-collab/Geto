@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import Any
 
@@ -36,12 +37,26 @@ def _rule_dict(r: GeofenceAlertRule) -> dict[str, Any]:
     }
 
 
+def _alert_source_id(a: GeofenceAlert) -> str | None:
+    payload = a.payload or {}
+    value = payload.get("source_id") if isinstance(payload, dict) else None
+    return str(value) if value else None
+
+
+def _alert_in_scope(a: GeofenceAlert, allowed_source_ids: Collection[str] | None) -> bool:
+    if allowed_source_ids is None:
+        return True
+    source_id = _alert_source_id(a)
+    return bool(source_id and source_id in {str(item) for item in allowed_source_ids})
+
+
 def _alert_dict(a: GeofenceAlert) -> dict[str, Any]:
     return {
         "id": str(a.id),
         "rule_id": str(a.rule_id) if a.rule_id else None,
         "geofence_id": str(a.geofence_id),
         "entity_id": a.entity_id,
+        "source_id": _alert_source_id(a),
         "event_type": a.event_type,
         "severity": a.severity,
         "status": a.status,
@@ -140,19 +155,47 @@ class AlertService:
         *,
         status: str | None = "open",
         limit: int = 50,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> list[dict[str, Any]]:
         stmt = select(GeofenceAlert).where(GeofenceAlert.tenant_id == tenant_id)
         if status:
             stmt = stmt.where(GeofenceAlert.status == status)
         stmt = stmt.order_by(GeofenceAlert.occurred_at.desc()).limit(limit)
         result = await session.execute(stmt)
-        return [_alert_dict(a) for a in result.scalars().all()]
+        rows = [a for a in result.scalars().all() if _alert_in_scope(a, allowed_source_ids)]
+        return [_alert_dict(a) for a in rows]
+
+    async def get_alert(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        alert_id: uuid.UUID,
+        *,
+        allowed_source_ids: Collection[str] | None = None,
+    ) -> GeofenceAlert | None:
+        alert = await session.get(GeofenceAlert, alert_id)
+        if not alert or alert.tenant_id != tenant_id:
+            return None
+        if not _alert_in_scope(alert, allowed_source_ids):
+            return None
+        return alert
 
     async def ack_alert(
-        self, session: AsyncSession, tenant_id: str, alert_id: uuid.UUID, user_id: str
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        alert_id: uuid.UUID,
+        user_id: str,
+        *,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> dict[str, Any] | None:
-        a = await session.get(GeofenceAlert, alert_id)
-        if not a or a.tenant_id != tenant_id:
+        a = await self.get_alert(
+            session,
+            tenant_id,
+            alert_id,
+            allowed_source_ids=allowed_source_ids,
+        )
+        if a is None:
             return None
         a.status = "acked"
         a.acked_at = datetime.now(UTC)
@@ -162,10 +205,20 @@ class AlertService:
         return _alert_dict(a)
 
     async def resolve_alert(
-        self, session: AsyncSession, tenant_id: str, alert_id: uuid.UUID
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        alert_id: uuid.UUID,
+        *,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> dict[str, Any] | None:
-        a = await session.get(GeofenceAlert, alert_id)
-        if not a or a.tenant_id != tenant_id:
+        a = await self.get_alert(
+            session,
+            tenant_id,
+            alert_id,
+            allowed_source_ids=allowed_source_ids,
+        )
+        if a is None:
             return None
         a.status = "resolved"
         a.resolved_at = datetime.now(UTC)
