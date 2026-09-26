@@ -65,7 +65,7 @@ jobs:
           docker run -d --name geoint-minio-ci -p 9000:9000 \
             -e MINIO_ROOT_USER=ciaccesskey12 \
             -e MINIO_ROOT_PASSWORD=cisecretkey123456 \
-            quay.io/minio/minio:RELEASE.2025-04-22T22-12-26Z server /data --console-address ":9001"
+            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data --console-address ":9001"
           for i in {1..30}; do
             curl -fsS http://127.0.0.1:8222/healthz >/dev/null && break
             sleep 1
