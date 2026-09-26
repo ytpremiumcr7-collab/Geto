@@ -12,6 +12,7 @@ import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.auth.jwt import JWTService
+from app.policies.source_access import readable_source_ids
 from app.realtime.manager import manager
 
 router = APIRouter(tags=["realtime"])
@@ -95,7 +96,11 @@ async def events_websocket(websocket: WebSocket):
 
     tenant_id = principal.tenant_id
     user_id = principal.user_id
-    await manager.connect(tenant_id, websocket)
+    await manager.connect(
+        tenant_id,
+        websocket,
+        allowed_source_ids=readable_source_ids(principal),
+    )
     log.info(
         "ws_connected",
         tenant_id=tenant_id,
