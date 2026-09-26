@@ -70,6 +70,12 @@ Full guide: [geoint-platform/docs/STAGING.md](geoint-platform/docs/STAGING.md)
 | [geoint-platform/docs/INGESTION.md](geoint-platform/docs/INGESTION.md) | Sources, FIRMS proxy, tiles |
 | [CHANGELOG.md](CHANGELOG.md) | Product version history |
 
-## License
+## Copyright and license
 
-Proprietary / project-defined. Confirm with the repository owner before redistribution.
+Copyright © 2026 ytpremiumcr7-collab. All rights reserved.
+
+This repository is proprietary. Public availability on GitHub does not grant permission to use, copy, modify, distribute, sublicense, sell, host, deploy, or create derivative works from its proprietary material without prior written authorization from the copyright holder.
+
+Third-party components remain subject to their own licenses and notices.
+
+See [COPYRIGHT.md](COPYRIGHT.md) for the full notice.
