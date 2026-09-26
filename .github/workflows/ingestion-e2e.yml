@@ -62,10 +62,20 @@ jobs:
       - name: Start NATS JetStream and MinIO
         run: |
           docker run -d --name geoint-nats-ci -p 4222:4222 -p 8222:8222 nats:2.10-alpine -js -m 8222
-          docker run -d --name geoint-minio-ci -p 9000:9000 \
-            -e MINIO_ROOT_USER=ciaccesskey12 \
-            -e MINIO_ROOT_PASSWORD=cisecretkey123456 \
-            minio/minio:RELEASE.2025-04-22T22-12-26Z server /data --console-address ":9001"
+
+          MINIO_RELEASE="RELEASE.2025-04-22T22-12-26Z"
+          MINIO_BIN="minio.linux-amd64.${MINIO_RELEASE}"
+          MINIO_URL="https://github.com/minio/minio/releases/download/${MINIO_RELEASE}/${MINIO_BIN}"
+          curl -fL --retry 3 --retry-delay 2 -o /tmp/minio "${MINIO_URL}"
+          echo "53e2a2cb16c5366ea6fbbc479c19ddb4c6a0948273e752f740fb1fbf27bb817c  /tmp/minio" | sha256sum -c -
+          chmod +x /tmp/minio
+          mkdir -p /tmp/geoint-minio-data
+          MINIO_ROOT_USER=ciaccesskey12 \
+          MINIO_ROOT_PASSWORD=cisecretkey123456 \
+            /tmp/minio server /tmp/geoint-minio-data --address ":9000" --console-address ":9001" \
+            >/tmp/geoint-minio.log 2>&1 &
+          echo $! >/tmp/geoint-minio.pid
+
           for i in {1..30}; do
             curl -fsS http://127.0.0.1:8222/healthz >/dev/null && break
             sleep 1
@@ -89,8 +99,12 @@ jobs:
         if: failure()
         run: |
           docker logs geoint-nats-ci || true
-          docker logs geoint-minio-ci || true
+          cat /tmp/geoint-minio.log || true
 
       - name: Stop NATS and MinIO
         if: always()
-        run: docker rm -f geoint-nats-ci geoint-minio-ci || true
+        run: |
+          docker rm -f geoint-nats-ci || true
+          if [ -f /tmp/geoint-minio.pid ]; then
+            kill "$(cat /tmp/geoint-minio.pid)" || true
+          fi
