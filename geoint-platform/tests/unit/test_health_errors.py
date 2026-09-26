@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 
@@ -41,7 +43,9 @@ async def test_readiness_structure_on_total_failure(monkeypatch):
 
     monkeypatch.setattr(health_mod, "ObjectStore", BoomStore)
 
-    body = await health_mod.readiness()
+    response = await health_mod.readiness()
+    assert response.status_code == 503
+    body = json.loads(response.body)
     assert body["status"] == "degraded"
     assert body["postgres"] is False
     assert body["nats"] is False
