@@ -91,9 +91,14 @@ jobs:
         working-directory: geoint-platform
         run: alembic upgrade head
 
-      - name: Run real ingestion pipeline
+      - name: Run real ingestion pipeline with critical coverage gate
         working-directory: geoint-platform
-        run: python scripts/e2e_ingestion_pipeline.py
+        run: |
+          coverage erase
+          coverage run --source=app scripts/e2e_ingestion_pipeline.py
+          coverage report --show-missing \
+            --include="app/workers/source_worker.py,app/workers/job_scheduler.py,app/jobs/repository.py,app/ingestion/dispatcher.py" \
+            --fail-under=60
 
       - name: Service logs on failure
         if: failure()
