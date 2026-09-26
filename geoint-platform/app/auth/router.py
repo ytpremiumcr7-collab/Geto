@@ -80,7 +80,10 @@ async def oidc_start(return_to: str = Query("/", max_length=512)):
 @router.get("/oidc/callback")
 async def oidc_callback(code: str = Query(...), state: str = Query(...)):
     if not settings.auth_cookie_mode:
-        raise HTTPException(status_code=503, detail="OIDC browser login requires AUTH_COOKIE_MODE=true")
+        raise HTTPException(
+            status_code=503,
+            detail="OIDC browser login requires AUTH_COOKIE_MODE=true",
+        )
     try:
         token, _principal, return_to = await OIDCService().exchange_callback(
             code=code,
