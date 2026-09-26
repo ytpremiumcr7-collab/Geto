@@ -90,8 +90,8 @@ wait_ready() {
 }
 
 migrate() {
-  log "Running alembic upgrade head"
-  compose exec -T geoint-api alembic upgrade head
+  log "Running alembic upgrade head before application services start"
+  compose run --rm --no-deps geoint-api alembic upgrade head
 }
 
 seed() {
@@ -110,13 +110,19 @@ seed() {
 cmd_up() {
   preflight_secrets
   export APP_ENV
-  log "Building and starting stack (APP_ENV=$APP_ENV)"
+  log "Building stack (APP_ENV=$APP_ENV)"
   compose pull || true
   compose build
-  compose up -d
-  wait_ready
+
+  # Bring up only stateful dependencies first. New application code must never
+  # execute against the previous schema.
+  compose up -d postgres redis nats minio
   migrate
   seed
+
+  # Start API/workers only after schema migration and seed complete.
+  compose up -d geoint-api geoint-scheduler geoint-worker geoint-outbox geoint-alert-notifier
+  wait_ready
   log "Deploy complete"
   compose ps
 }
@@ -159,7 +165,7 @@ usage() {
   cat <<EOF
 Usage: $0 <up|migrate|seed|down|status|remote-up>
 
-  up          preflight secrets → build → up → wait ready → migrate → seed
+  up          preflight → build → dependencies → migrate → seed → app → readiness
   migrate     alembic upgrade head only
   seed        apply seed_source_jobs.sql
   down        compose down
