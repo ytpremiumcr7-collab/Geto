@@ -149,6 +149,11 @@ class Settings(BaseSettings):
     alert_notifier_batch_size: int = 20
     alert_notifier_lease_seconds: int = 120
 
+    # Transactional outbox delivery policy
+    outbox_lease_seconds: int = 120
+    outbox_max_attempts: int = 8
+    outbox_base_backoff_seconds: int = 5
+
 
 @lru_cache
 def get_settings() -> Settings:
