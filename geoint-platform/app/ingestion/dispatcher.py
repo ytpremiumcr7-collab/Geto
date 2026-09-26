@@ -20,6 +20,7 @@ from app.db.repositories import EntityRepository
 from app.db.tenant import set_tenant
 from app.domain.models import Observation
 from app.domain.quality import calculate_quality
+from app.events.repository import EventRepository
 from app.geofencing.service import GeofenceService
 from app.infrastructure.object_store import ObjectStore
 from app.infrastructure.retry import retryable
@@ -143,6 +144,7 @@ class SourceDispatcher:
         ch_rows: list[dict] = []
         geofence_service = GeofenceService()
         outbox_early = OutboxRepository()
+        event_repo = EventRepository(session)
 
         async for obs in adapter.normalize(raw, received_at):
             seen += 1
@@ -186,18 +188,27 @@ class SourceDispatcher:
                         source_id=obs.source_id,
                     )
                 for ev in correlator.detect(obs):
+                    event_payload = {
+                        "event_type": ev.event_type,
+                        "entity_id": ev.entity_id,
+                        "source_id": obs.source_id,
+                        "severity": ev.severity,
+                        "observed_at": ev.observed_at.isoformat(),
+                        "data": ev.payload,
+                        "tenant_id": tenant_id,
+                    }
+                    await event_repo.append(
+                        tenant_id=tenant_id,
+                        source_id=obs.source_id,
+                        event_type=ev.event_type,
+                        entity_id=ev.entity_id,
+                        occurred_at=ev.observed_at,
+                        payload=event_payload,
+                    )
                     await outbox_early.enqueue(
                         session,
                         subject=f"geoint.event.{tenant_id}",
-                        payload={
-                            "event_type": ev.event_type,
-                            "entity_id": ev.entity_id,
-                            "source_id": obs.source_id,
-                            "severity": ev.severity,
-                            "observed_at": ev.observed_at.isoformat(),
-                            "data": ev.payload,
-                            "tenant_id": tenant_id,
-                        },
+                        payload=event_payload,
                         tenant_id=tenant_id,
                     )
 
