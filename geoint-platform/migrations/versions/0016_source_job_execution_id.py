@@ -21,6 +21,17 @@ def upgrade() -> None:
         "source_jobs",
         sa.Column("execution_id", postgresql.UUID(as_uuid=True), nullable=True),
     )
+    # Existing queued/retry/running rows may already have a JetStream message
+    # whose legacy Nats-Msg-Id is the permanent job id. Preserve those in-flight
+    # executions across the migration so the worker can finish them safely.
+    op.execute(
+        """
+        UPDATE source_jobs
+        SET execution_id = id
+        WHERE execution_id IS NULL
+          AND status IN ('queued', 'retry', 'running')
+        """
+    )
     op.create_index(
         "ix_source_jobs_execution_id",
         "source_jobs",
