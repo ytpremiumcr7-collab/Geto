@@ -59,8 +59,11 @@ class JobScheduler:
 
         for job in jobs:
             try:
+                if job.execution_id is None:
+                    raise RuntimeError(f"claimed job {job.id} has no execution_id")
                 await self.js.publish_job(
                     job_id=job.id,
+                    execution_id=job.execution_id,
                     source_id=job.source_id,
                     job_type=job.job_type,
                     config=job.config or {},
@@ -79,7 +82,13 @@ class JobScheduler:
                 )
                 tenant_id = getattr(job, "tenant_id", None) or "default"
                 async with tenant_session(tenant_id) as session:
-                    await self.repo.mark_failure(session, job.id, str(exc))
+                    if job.execution_id is not None:
+                        await self.repo.mark_failure(
+                            session,
+                            job.id,
+                            str(exc),
+                            execution_id=job.execution_id,
+                        )
 
     def stop(self) -> None:
         self._running = False
