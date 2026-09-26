@@ -35,7 +35,7 @@ class JobRepository:
             .where(
                 SourceJob.enabled.is_(True),
                 SourceJob.next_run_at <= now,
-                SourceJob.status.in_(("pending", "retry", "queued")),
+                SourceJob.status.in_(("pending", "retry", "queued", "running")),
             )
             .where((SourceJob.locked_until.is_(None)) | (SourceJob.locked_until < now))
             .order_by(SourceJob.next_run_at)
@@ -126,6 +126,7 @@ class JobRepository:
         job = await session.get(SourceJob, job_id)
         if not job or job.execution_id != execution_id:
             return False
+        job.status = "running"
         job.locked_until = datetime.now(UTC) + timedelta(seconds=max(30, lease_seconds))
         job.locked_by = worker_id
         await session.commit()
@@ -217,6 +218,38 @@ class IdempotencyRepository:
 
         await session.commit()
         return outcome
+
+    async def renew_claim(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str,
+        message_id: str,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> None:
+        now = datetime.now(UTC)
+        lease_until = now + timedelta(seconds=max(30, lease_seconds))
+        await session.execute(
+            text(
+                """
+                UPDATE processed_messages
+                SET lease_until = :lease_until, updated_at = :now
+                WHERE tenant_id = :tid
+                  AND message_id = :mid
+                  AND worker_id = :wid
+                  AND status = 'processing'
+                """
+            ),
+            {
+                "lease_until": lease_until,
+                "now": now,
+                "tid": tenant_id,
+                "mid": message_id,
+                "wid": worker_id,
+            },
+        )
+        await session.commit()
 
     async def mark_completed(
         self,
