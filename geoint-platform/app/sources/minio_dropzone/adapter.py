@@ -105,18 +105,17 @@ class MinIODropzoneAdapter(SourceAdapter):
         for item in raw_data:
             key = item.get("key", "unknown")
             payload = item.get("payload")
-            try:
-                async for obs in self._normalize_payload(payload, received_at, key):
-                    yield obs
-                try:
-                    self.mark_processed(key, failed=False)
-                except Exception:
-                    pass
-            except Exception:
-                try:
-                    self.mark_processed(key, failed=True)
-                except Exception:
-                    pass
+            async for obs in self._normalize_payload(payload, received_at, key):
+                yield obs
+
+    async def after_commit(self, raw_data: Any) -> None:
+        """Move inputs only after the database transaction is durable."""
+        if not isinstance(raw_data, list):
+            return
+        for item in raw_data:
+            key = item.get("key") if isinstance(item, dict) else None
+            if key:
+                self.mark_processed(str(key), failed=False)
 
     async def _normalize_payload(
         self,
