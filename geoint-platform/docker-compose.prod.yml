@@ -108,6 +108,22 @@ services:
       retries: 10
       start_period: 40s
 
+  geoint-web:
+    build:
+      context: ../geoint-web
+    depends_on:
+      geoint-api:
+        condition: service_healthy
+    ports:
+      - "${GEOINT_WEB_PORT:-8080}:8080"
+    restart: unless-stopped
+    networks: [geoint]
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /var/cache/nginx
+      - /var/run
+
   geoint-scheduler:
     build: .
     command: ["python", "-m", "app.workers.job_scheduler"]
