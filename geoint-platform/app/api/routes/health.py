@@ -6,6 +6,7 @@ import time
 
 import structlog
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
 from app.db.session import engine
@@ -26,9 +27,8 @@ async def readiness():
     """Readiness: each dependency checked; failures recorded in errors[].
 
     status:
-      - ok: all required deps healthy
-      - degraded: at least one required dep failed (still returns 200 so
-        orchestrators can inspect body; use /health/live for pure liveness)
+      - ok: all required deps healthy (HTTP 200)
+      - degraded: at least one required dep failed (HTTP 503)
     """
     checks: dict[str, bool] = {
         "postgres": False,
@@ -103,12 +103,15 @@ async def readiness():
     timings_ms["minio"] = round((time.perf_counter() - t0) * 1000, 1)
 
     all_ok = all(checks.values())
-    return {
+    body = {
         "status": "ok" if all_ok else "degraded",
         **checks,
         "errors": errors,
         "timings_ms": timings_ms,
     }
+    if not all_ok:
+        return JSONResponse(status_code=503, content=body)
+    return body
 
 
 @router.get("/health/version")
