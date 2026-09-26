@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
-from uuid import uuid4
 from datetime import UTC, datetime, timedelta
-from uuid import UUID
+from uuid import UUID, uuid4
 
-from sqlalchemy import text, select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.jobs.models import ProcessedMessage, SourceJob
@@ -86,7 +85,10 @@ class JobRepository:
         job.locked_until = None
         job.locked_by = None
         job.last_error = (error or "")[:4000]
-    class IdempotencyRepository:
+        await session.commit()
+
+
+class IdempotencyRepository:
     """Atomic claim before side effects: processing → completed | failed."""
 
     async def try_claim(
@@ -107,7 +109,6 @@ class JobRepository:
           busy — another worker holds a live lease; NAK for redelivery
         """
         from sqlalchemy.dialects.postgresql import insert
-        from sqlalchemy import text
 
         now = datetime.now(UTC)
         lease_until = now + timedelta(seconds=max(30, lease_seconds))
