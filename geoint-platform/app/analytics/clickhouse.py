@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import hashlib
-from collections.abc import Collection
 import json
 import logging
+from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import Any
 from urllib.parse import urlencode
