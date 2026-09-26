@@ -111,6 +111,13 @@ class Settings(BaseSettings):
     api_key_hashes: str | None = None
     jwt_jwks_url: str | None = None  # REQUIRED in production: OIDC JWKS URL
     jwt_tenant_claim: str = "tenant_id"
+    # Browser OIDC/BFF (Authorization Code + PKCE)
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None  # optional confidential-client mode
+    oidc_redirect_uri: str | None = None
+    oidc_discovery_url: str | None = None
+    oidc_scopes: str = "openid profile email"
+    oidc_state_ttl_seconds: int = 600
     # Emergency only: allow HS256 in production when OIDC is temporarily unavailable
     allow_hs256_in_production: bool = False
     rate_limit_per_minute: int = 120
