@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import socket
 
 import structlog
 
@@ -25,6 +26,7 @@ class OutboxDispatcher:
         self.interval = interval
         self.repo = OutboxRepository()
         self.js = JetStreamClient()
+        self.worker_id = os.getenv("OUTBOX_WORKER_ID") or f"{socket.gethostname()}-{os.getpid()}"
         self._running = False
 
     async def run(self) -> None:
@@ -42,40 +44,63 @@ class OutboxDispatcher:
             await self.js.close()
 
     async def process_batch(self) -> None:
+        from app.core.config import settings
+
         async with system_worker_session() as session:
-            messages = await self.repo.claim(session, self.batch_size)
-            for message in messages:
-                try:
-                    if message.subject == "geoint.analytics.observations":
-                        from app.analytics.clickhouse import ClickHouseSink
+            messages = await self.repo.claim(
+                session,
+                worker_id=self.worker_id,
+                limit=self.batch_size,
+                lease_seconds=settings.outbox_lease_seconds,
+            )
 
-                        payload = message.payload or {}
-                        rows = payload.get("rows") or []
-                        tenant_id = payload.get("tenant_id") or "default"
-                        if rows:
-                            await ClickHouseSink().write_observations(rows, tenant_id=tenant_id)
-                        await self.repo.mark_published(session, message)
-                        log.info(
-                            "clickhouse_outbox_written",
-                            message_id=str(message.id),
-                            rows=len(rows),
-                        )
-                        continue
+        # Network I/O intentionally happens after claim() committed and released
+        # row locks. Completion/failure bookkeeping uses separate short TXs.
+        for message in messages:
+            try:
+                if message.subject == "geoint.analytics.observations":
+                    from app.analytics.clickhouse import ClickHouseSink
 
+                    payload = message.payload or {}
+                    rows = payload.get("rows") or []
+                    tenant_id = payload.get("tenant_id") or message.tenant_id
+                    if rows:
+                        await ClickHouseSink().write_observations(rows, tenant_id=tenant_id)
+                    log.info(
+                        "clickhouse_outbox_written",
+                        message_id=str(message.id),
+                        rows=len(rows),
+                    )
+                else:
                     assert self.js.js is not None
                     await self.js.js.publish(
                         message.subject,
                         json.dumps(message.payload, default=str).encode(),
+                        headers={"Nats-Msg-Id": str(message.id)},
                     )
-                    await self.repo.mark_published(session, message)
-                except Exception as exc:
-                    await self.repo.mark_failed(message, str(exc))
-                    log.warning(
-                        "outbox_publish_failed",
-                        message_id=str(message.id),
+
+                async with system_worker_session() as session:
+                    await self.repo.mark_published(
+                        session,
+                        message_id=message.id,
+                        worker_id=self.worker_id,
+                    )
+            except Exception as exc:
+                async with system_worker_session() as session:
+                    await self.repo.persist_failure(
+                        session,
+                        message_id=message.id,
+                        worker_id=self.worker_id,
                         error=str(exc),
+                        max_attempts=settings.outbox_max_attempts,
+                        base_backoff_seconds=settings.outbox_base_backoff_seconds,
                     )
-            await session.commit()
+                log.warning(
+                    "outbox_publish_failed",
+                    message_id=str(message.id),
+                    error=str(exc),
+                )
+
 
     def stop(self) -> None:
         self._running = False
