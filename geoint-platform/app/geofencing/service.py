@@ -5,7 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.geofencing.repository import GeofenceRepository
@@ -27,6 +26,7 @@ class GeofenceService:
         altitude: float | None,
         observed_at: datetime,
         entity_type: str | None = None,
+        source_id: str | None = None,
     ) -> list[dict[str, Any]]:
         containing = await self.repository.find_containing(
             session,
@@ -63,6 +63,7 @@ class GeofenceService:
                     "event_type": "geofence.enter",
                     "tenant_id": tenant_id,
                     "entity_id": entity_id,
+                    "source_id": source_id,
                     "geofence_id": str(fence.id),
                     "geofence_name": fence.name,
                     "occurred_at": observed_at.isoformat(),
@@ -96,6 +97,7 @@ class GeofenceService:
                     "event_type": "geofence.exit",
                     "tenant_id": tenant_id,
                     "entity_id": entity_id,
+                    "source_id": source_id,
                     "geofence_id": str(state.geofence_id),
                     "occurred_at": observed_at.isoformat(),
                     "data": {
@@ -113,38 +115,15 @@ class GeofenceService:
                     tenant_id=tenant_id,
                 )
 
-        # Product path: materialize GeofenceAlert rows for matching rules
+        # Alert materialization participates in the same DB transaction as
+        # observations/geofence state. Failure must abort the ingestion transaction
+        # so the worker can retry; a synthetic retry subject with no consumer would
+        # otherwise acknowledge data without its alert side effects.
         if events:
-            try:
-                from app.alerts.service import AlertService
+            from app.alerts.service import AlertService
 
-                alert_svc = AlertService()
-                for ev in events:
-                    await alert_svc.emit_from_geofence_event(session, tenant_id=tenant_id, event=ev)
-            except Exception as exc:
-                # Do not roll back observation/geofence state, but never swallow silently.
-                structlog.get_logger().exception(
-                    "geofence_alert_emit_failed",
-                    tenant_id=tenant_id,
-                    entity_id=entity_id,
-                    event_count=len(events),
-                    error=str(exc)[:500],
-                )
-                try:
-                    await outbox.enqueue(
-                        session,
-                        subject=f"geoint.alert.retry.{tenant_id}",
-                        payload={
-                            "reason": "emit_failed",
-                            "error": str(exc)[:500],
-                            "events": events,
-                        },
-                        tenant_id=tenant_id,
-                    )
-                except Exception as nested:
-                    structlog.get_logger().exception(
-                        "geofence_alert_retry_enqueue_failed",
-                        error=str(nested)[:300],
-                    )
+            alert_svc = AlertService()
+            for ev in events:
+                await alert_svc.emit_from_geofence_event(session, tenant_id=tenant_id, event=ev)
 
         return events
