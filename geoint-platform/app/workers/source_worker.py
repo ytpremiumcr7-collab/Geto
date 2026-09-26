@@ -57,7 +57,13 @@ class SourceWorker:
             await js.add_stream(
                 StreamConfig(
                     name=settings.nats_stream,
-                    subjects=[f"{JOBS_PREFIX}.>", "geoint.observation.>", "geoint.event.>"],
+                    subjects=[
+                        f"{JOBS_PREFIX}.>",
+                        "geoint.observation.>",
+                        "geoint.event.>",
+                        "geoint.alert.>",
+                        "geoint.ingestion.>",
+                    ],
                     retention=RetentionPolicy.LIMITS,
                     storage=StorageType.FILE,
                     max_age=settings.nats_max_age_seconds,
