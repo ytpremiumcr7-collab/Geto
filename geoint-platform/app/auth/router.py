@@ -58,7 +58,10 @@ async def oidc_status():
         and settings.oidc_redirect_uri
         and settings.jwt_jwks_url
     )
-    return {"enabled": enabled}
+    return {
+        "enabled": enabled,
+        "development_bootstrap": settings.app_env in ("development", "dev", "test"),
+    }
 
 
 @router.get("/oidc/start")
