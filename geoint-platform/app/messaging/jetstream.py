@@ -37,6 +37,8 @@ class JetStreamClient:
                     f"{JOBS_PREFIX}.>",
                     "geoint.observation.>",
                     "geoint.event.>",
+                    "geoint.alert.>",
+                    "geoint.ingestion.>",
                 ],
                 retention=RetentionPolicy.LIMITS,
                 storage=StorageType.FILE,
