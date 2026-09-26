@@ -182,6 +182,8 @@ class SourceDispatcher:
                         lat=obs.position.lat,
                         altitude=obs.position.altitude_m,
                         observed_at=obs.observed_at,
+                        entity_type=obs.entity_type,
+                        source_id=obs.source_id,
                     )
                 for ev in correlator.detect(obs):
                     await outbox_early.enqueue(
@@ -190,6 +192,7 @@ class SourceDispatcher:
                         payload={
                             "event_type": ev.event_type,
                             "entity_id": ev.entity_id,
+                            "source_id": obs.source_id,
                             "severity": ev.severity,
                             "observed_at": ev.observed_at.isoformat(),
                             "data": ev.payload,
