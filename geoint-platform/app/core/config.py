@@ -15,7 +15,7 @@ class Settings(BaseSettings):
     app_env: str = "development"
     log_level: str = "INFO"
 
-    api_host: str = "0.0.0.0"
+    api_host: str = "127.0.0.1"
     api_port: int = 8000
 
     database_url: str
@@ -90,6 +90,7 @@ class Settings(BaseSettings):
     cors_allow_http: bool = False  # lab only: allow http:// origins when true
     # Trusted hosts for reverse-proxy deployments (comma-separated); empty = skip
     trusted_hosts: str = ""
+    trusted_proxy_cidrs: str = ""  # comma-separated CIDRs allowed to set X-Forwarded-For
 
     # Auth
     auth_disabled: bool = False
@@ -146,11 +147,13 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     alert_notifier_poll_seconds: float = 2.0
     alert_notifier_batch_size: int = 20
+    alert_notifier_lease_seconds: int = 120
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    # Required values are supplied by pydantic-settings from env/.env at runtime.
+    return Settings()  # type: ignore[call-arg]
 
 
 settings = get_settings()

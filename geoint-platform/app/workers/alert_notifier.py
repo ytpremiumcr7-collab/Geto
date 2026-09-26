@@ -12,38 +12,47 @@ import asyncio
 import json
 import os
 import signal
+import socket
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 import structlog
-from sqlalchemy import text
-from app.db.tenant import set_system_worker, set_tenant
 
 from app.alerts.delivery import DeliveryService
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.security_bootstrap import validate_settings
-from app.db.session import SessionLocal
+from app.db.tenant import system_worker_session, tenant_session
 
 log = structlog.get_logger()
 
 HEARTBEAT_PATH = Path(
-    os.getenv("ALERT_NOTIFIER_HEARTBEAT_PATH", "/tmp/geoint_alert_notifier_heartbeat")
+    os.getenv(
+        "ALERT_NOTIFIER_HEARTBEAT_PATH",
+        str(Path(tempfile.gettempdir()) / "geoint_alert_notifier_heartbeat"),
+    )
 )
 
 
 class AlertNotifierWorker:
     def __init__(self) -> None:
         self.poll = float(
-            os.getenv("ALERT_NOTIFIER_POLL_SECONDS")
-            or getattr(settings, "alert_notifier_poll_seconds", 2.0)
+            os.getenv("ALERT_NOTIFIER_POLL_SECONDS") or settings.alert_notifier_poll_seconds
         )
         self.batch = int(
-            os.getenv("ALERT_NOTIFIER_BATCH_SIZE")
-            or getattr(settings, "alert_notifier_batch_size", 20)
+            os.getenv("ALERT_NOTIFIER_BATCH_SIZE") or settings.alert_notifier_batch_size
         )
+        self.health_host = os.getenv("ALERT_NOTIFIER_HEALTH_HOST", "127.0.0.1")
         self.health_port = int(os.getenv("ALERT_NOTIFIER_HEALTH_PORT", "8081"))
+        self.lease_seconds = int(
+            os.getenv("ALERT_NOTIFIER_LEASE_SECONDS") or settings.alert_notifier_lease_seconds
+        )
+        self.worker_id = os.getenv("ALERT_NOTIFIER_WORKER_ID") or (
+            f"{socket.gethostname()}-{os.getpid()}-{uuid4().hex[:8]}"
+        )
         self.ready_max_age_s = float(os.getenv("ALERT_NOTIFIER_READY_MAX_AGE_S", "30"))
         self._running = True
         self.delivery = DeliveryService()
@@ -115,8 +124,12 @@ class AlertNotifierWorker:
                 pass
 
     async def _run_health_server(self) -> None:
-        server = await asyncio.start_server(self._handle_health, "0.0.0.0", self.health_port)
-        log.info("alert_notifier_health_listen", port=self.health_port)
+        server = await asyncio.start_server(
+            self._handle_health,
+            self.health_host,
+            self.health_port,
+        )
+        log.info("alert_notifier_health_listen", host=self.health_host, port=self.health_port)
         async with server:
             await server.serve_forever()
 
@@ -145,33 +158,45 @@ class AlertNotifierWorker:
             log.info("alert_notifier_stopped")
 
     async def _tick(self) -> None:
-        async with SessionLocal() as session:
-            await set_system_worker(session)
-            claimed = await self.delivery.claim_batch(session, limit=self.batch)
-            if not claimed:
-                await session.commit()
-                return
-            for d in claimed:
-                await set_tenant(session, d.tenant_id)
-                try:
-                    result = await self.delivery.process_one(session, d)
-                    st = result.get("status")
-                    if st == "delivered":
-                        self._deliveries_ok += 1
-                    elif st in ("failed", "pending"):
-                        if st == "failed":
-                            self._deliveries_fail += 1
-                    log.info(
-                        "alert_delivery_processed",
-                        delivery_id=result.get("id"),
-                        status=st,
-                        channel_type=result.get("channel_type"),
-                        attempts=result.get("attempts"),
-                    )
-                except Exception:
-                    self._deliveries_fail += 1
-                    log.exception("alert_delivery_one_failed", delivery_id=str(d.id))
+        async with system_worker_session() as session:
+            claimed = await self.delivery.claim_batch(
+                session,
+                worker_id=self.worker_id,
+                limit=self.batch,
+                lease_seconds=self.lease_seconds,
+            )
             await session.commit()
+
+        for claim in claimed:
+            try:
+                async with tenant_session(claim.tenant_id) as session:
+                    result = await self.delivery.process_one(
+                        session,
+                        delivery_id=claim.id,
+                        worker_id=self.worker_id,
+                    )
+                    await session.commit()
+                status = result.get("status")
+                if status == "delivered":
+                    self._deliveries_ok += 1
+                elif status == "failed":
+                    self._deliveries_fail += 1
+                log.info(
+                    "alert_delivery_processed",
+                    delivery_id=result.get("id"),
+                    status=status,
+                    channel_type=result.get("channel_type"),
+                    attempts=result.get("attempts"),
+                )
+            except Exception:
+                # The persisted sending lease is intentionally left intact.
+                # A later worker can reclaim it after lease expiry.
+                self._deliveries_fail += 1
+                log.exception(
+                    "alert_delivery_one_failed",
+                    delivery_id=str(claim.id),
+                    worker_id=self.worker_id,
+                )
 
 
 async def _amain() -> None:
@@ -195,5 +220,6 @@ def main() -> None:
 
 if __name__ == "__main__":
     import os
+
     os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     main()

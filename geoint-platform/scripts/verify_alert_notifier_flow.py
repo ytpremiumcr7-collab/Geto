@@ -334,10 +334,13 @@ async def main() -> int:
 
     # --- Worker module syntax / structure ---
     worker_src = Path("app/workers/alert_notifier.py").read_text()
+    tenant_src = Path("app/db/tenant.py").read_text()
     assert "AlertNotifierWorker" in worker_src
     assert "claim_batch" in worker_src or "process_one" in worker_src
-    assert "__system__" in worker_src
-    print("  PASS  worker source structure\n")
+    assert "system_worker_session" in worker_src
+    assert "tenant_session" in worker_src
+    assert 'SYSTEM_TENANT = "__system__"' in tenant_src
+    print("  PASS  worker RLS session structure\n")
 
     # --- API routes present ---
     alerts_api = Path("app/api/routes/alerts.py").read_text()

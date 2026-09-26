@@ -63,7 +63,9 @@ class OpenSkyAdapter(SourceAdapter):
         lomin: float | None = None,
         lamax: float | None = None,
         lomax: float | None = None,
+        **kwargs: Any,
     ) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         headers = await self._headers()
 
         params = {}

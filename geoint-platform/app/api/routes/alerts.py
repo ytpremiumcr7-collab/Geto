@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.alerts.delivery import DeliveryService
@@ -12,6 +13,7 @@ from app.alerts.service import AlertService
 from app.auth.dependencies import get_current_principal, get_tenant_db, require_roles
 from app.auth.models import Principal
 from app.db.session import get_db  # noqa: F401 — legacy
+from app.geofencing.models import Geofence
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 svc = AlertService()
@@ -88,9 +90,6 @@ async def create_rule(
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
     # Geofence must belong to the same tenant (integrity, not only RLS)
-    from sqlalchemy import select
-    from app.geofencing.models import Geofence
-
     fence = (
         await db.execute(
             select(Geofence).where(

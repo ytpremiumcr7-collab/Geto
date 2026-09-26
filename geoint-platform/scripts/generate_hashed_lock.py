@@ -8,6 +8,7 @@ Then install:
   pip install --require-hashes -r requirements.lock.txt
   pip install --no-deps -e .
 """
+
 from __future__ import annotations
 
 import json

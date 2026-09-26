@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from shapely.geometry import MultiPolygon, Polygon, mapping, shape
+from shapely.geometry import MultiPolygon, shape
 from shapely.validation import explain_validity, make_valid
 
 MAX_COORDINATES = 50_000
@@ -20,9 +20,7 @@ def validate_and_normalize_geofence_geometry(geojson: dict[str, Any]) -> MultiPo
 
     raw = json.dumps(geojson, default=str)
     if len(raw.encode("utf-8")) > MAX_GEOJSON_BYTES:
-        raise InvalidGeofenceGeometry(
-            f"geometry payload exceeds {MAX_GEOJSON_BYTES} bytes"
-        )
+        raise InvalidGeofenceGeometry(f"geometry payload exceeds {MAX_GEOJSON_BYTES} bytes")
 
     try:
         geom = shape(geojson)
@@ -35,6 +33,7 @@ def validate_and_normalize_geofence_geometry(geojson: dict[str, Any]) -> MultiPo
     # Count coordinates (rough complexity bound)
     coords = 0
     try:
+
         def _count(g):
             nonlocal coords
             if g.is_empty:

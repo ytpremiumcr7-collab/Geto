@@ -126,8 +126,8 @@ async def metrics(request: Request):
         if not auth:
             return Response(status_code=401, content=b"Unauthorized")
         try:
-            from app.auth.jwt import JWTService
             from app.auth.dependencies import _api_key_principal
+            from app.auth.jwt import JWTService
 
             principal = None
             if auth.lower().startswith("bearer "):
@@ -137,12 +137,8 @@ async def metrics(request: Request):
             if principal is None:
                 return Response(status_code=401, content=b"Unauthorized")
             # Require admin or explicit metrics role
-            roles = getattr(principal, "roles", frozenset()) or frozenset()
-            if not (
-                "admin" in roles
-                or "metrics" in roles
-                or "geoint.metrics.read" in roles
-            ):
+            roles: frozenset[str] = principal.roles
+            if not ("admin" in roles or "metrics" in roles or "geoint.metrics.read" in roles):
                 return Response(status_code=403, content=b"Forbidden")
         except Exception:
             return Response(status_code=401, content=b"Unauthorized")

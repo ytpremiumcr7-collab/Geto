@@ -1,4 +1,5 @@
 import pytest
+
 from app.geofencing.geometry_validate import (
     InvalidGeofenceGeometry,
     validate_and_normalize_geofence_geometry,

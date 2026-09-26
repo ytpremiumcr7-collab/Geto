@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
 from sqlalchemy import select, text
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.jobs.models import ProcessedMessage, SourceJob
@@ -95,6 +96,7 @@ class IdempotencyRepository:
         self,
         session: AsyncSession,
         *,
+        tenant_id: str,
         message_id: str,
         subject: str,
         source_id: str | None,
@@ -108,8 +110,6 @@ class IdempotencyRepository:
           completed — already finished successfully; ACK
           busy — another worker holds a live lease; NAK for redelivery
         """
-        from sqlalchemy.dialects.postgresql import insert
-
         now = datetime.now(UTC)
         lease_until = now + timedelta(seconds=max(30, lease_seconds))
         msg_uuid = uuid4()
@@ -119,6 +119,7 @@ class IdempotencyRepository:
             insert(ProcessedMessage)
             .values(
                 id=msg_uuid,
+                tenant_id=tenant_id,
                 message_id=message_id,
                 subject=subject,
                 source_id=source_id,
@@ -127,7 +128,7 @@ class IdempotencyRepository:
                 worker_id=worker_id,
             )
             .on_conflict_do_update(
-                constraint="uq_processed_messages_message_id",
+                constraint="uq_processed_messages_tenant_message_id",
                 set_={
                     "status": "processing",
                     "lease_until": lease_until,
@@ -149,29 +150,36 @@ class IdempotencyRepository:
         )
         result = await session.execute(stmt)
         row = result.first()
-        await session.commit()
 
         if row is not None and row.worker_id == worker_id and row.status == "processing":
-            return "claimed"
+            outcome = "claimed"
+        else:
+            # Inspect the conflicting row before commit. RLS set_config is
+            # transaction-local, so querying after commit would drop worker context.
+            cur = await session.execute(
+                select(ProcessedMessage).where(
+                    ProcessedMessage.tenant_id == tenant_id,
+                    ProcessedMessage.message_id == message_id,
+                )
+            )
+            existing = cur.scalar_one_or_none()
+            if existing is None:
+                outcome = "busy"
+            elif existing.status == "completed":
+                outcome = "completed"
+            elif existing.worker_id == worker_id and existing.status == "processing":
+                outcome = "claimed"
+            else:
+                outcome = "busy"
 
-        # Conflict did not update us — inspect current state
-        cur = await session.execute(
-            select(ProcessedMessage).where(ProcessedMessage.message_id == message_id)
-        )
-        existing = cur.scalar_one_or_none()
-        if existing is None:
-            # Should not happen; treat as claimable next time
-            return "busy"
-        if existing.status == "completed":
-            return "completed"
-        if existing.worker_id == worker_id and existing.status == "processing":
-            return "claimed"
-        return "busy"
+        await session.commit()
+        return outcome
 
     async def mark_completed(
         self,
         session: AsyncSession,
         *,
+        tenant_id: str,
         message_id: str,
         worker_id: str,
     ) -> None:
@@ -181,10 +189,10 @@ class IdempotencyRepository:
                 """
                 UPDATE processed_messages
                 SET status = 'completed', lease_until = NULL, updated_at = :now
-                WHERE message_id = :mid AND worker_id = :wid
+                WHERE tenant_id = :tid AND message_id = :mid AND worker_id = :wid
                 """
             ),
-            {"now": now, "mid": message_id, "wid": worker_id},
+            {"now": now, "tid": tenant_id, "mid": message_id, "wid": worker_id},
         )
         await session.commit()
 
@@ -192,6 +200,7 @@ class IdempotencyRepository:
         self,
         session: AsyncSession,
         *,
+        tenant_id: str,
         message_id: str,
         worker_id: str,
     ) -> None:
@@ -202,16 +211,26 @@ class IdempotencyRepository:
                 """
                 UPDATE processed_messages
                 SET status = 'failed', lease_until = NULL, updated_at = :now
-                WHERE message_id = :mid AND worker_id = :wid AND status = 'processing'
+                WHERE tenant_id = :tid
+                  AND message_id = :mid
+                  AND worker_id = :wid
+                  AND status = 'processing'
                 """
             ),
-            {"now": now, "mid": message_id, "wid": worker_id},
+            {"now": now, "tid": tenant_id, "mid": message_id, "wid": worker_id},
         )
         await session.commit()
 
     # Back-compat helpers
-    async def is_processed(self, session: AsyncSession, message_id: str) -> bool:
+    async def is_processed(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str,
+        message_id: str,
+    ) -> bool:
         stmt = select(ProcessedMessage.id).where(
+            ProcessedMessage.tenant_id == tenant_id,
             ProcessedMessage.message_id == message_id,
             ProcessedMessage.status == "completed",
         )
@@ -222,22 +241,22 @@ class IdempotencyRepository:
         self,
         session: AsyncSession,
         *,
+        tenant_id: str,
         message_id: str,
         subject: str,
         source_id: str | None = None,
     ) -> bool:
         """Legacy path: insert completed. Prefer try_claim + mark_completed."""
-        from sqlalchemy.dialects.postgresql import insert
-
         stmt = (
             insert(ProcessedMessage)
             .values(
+                tenant_id=tenant_id,
                 message_id=message_id,
                 subject=subject,
                 source_id=source_id,
                 status="completed",
             )
-            .on_conflict_do_nothing(constraint="uq_processed_messages_message_id")
+            .on_conflict_do_nothing(constraint="uq_processed_messages_tenant_message_id")
             .returning(ProcessedMessage.id)
         )
         result = await session.execute(stmt)

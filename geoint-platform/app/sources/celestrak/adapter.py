@@ -40,7 +40,9 @@ class CelesTrakAdapter(SourceAdapter):
     async def fetch(
         self,
         group: str | None = None,
+        **kwargs: Any,
     ) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         async with httpx.AsyncClient(timeout=30) as client:
             response = await client.get(
                 settings.celestrak_base_url,

@@ -5,8 +5,8 @@ from __future__ import annotations
 import asyncio
 import json
 from datetime import UTC, datetime
-from uuid import uuid4
 from io import BytesIO
+from uuid import uuid4
 
 from minio import Minio
 
@@ -107,6 +107,5 @@ class ObjectStore:
         msg_part = (message_id or uid)[:64]
         suffix = entity_id or "batch"
         return (
-            f"raw/{tenant_id}/{source_id}/{now:%Y/%m/%d}/"
-            f"{job_part}_{msg_part}_{suffix}_{uid}.json"
+            f"raw/{tenant_id}/{source_id}/{now:%Y/%m/%d}/{job_part}_{msg_part}_{suffix}_{uid}.json"
         )

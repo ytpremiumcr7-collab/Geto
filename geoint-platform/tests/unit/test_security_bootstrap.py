@@ -24,6 +24,8 @@ def _settings(**kwargs):
         jwt_secret="",
         allow_hs256_in_production=False,
         auth_bootstrap_secret=None,
+        trusted_hosts="api.example.com",
+        api_keys="",
     )
     base.update(kwargs)
     return SimpleNamespace(**base)
@@ -145,3 +147,24 @@ def test_staging_requires_same_as_production():
             _settings(app_env="staging", jwt_jwks_url=None, jwt_algorithm="RS256"),
             role="test",
         )
+
+
+def test_production_rejects_missing_trusted_hosts():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="TRUSTED_HOSTS"):
+        validate_settings(_settings(trusted_hosts=""), role="test")
+
+
+def test_development_does_not_apply_production_plaintext_api_key_gate():
+    from app.core.security_bootstrap import validate_settings
+
+    validate_settings(
+        _settings(
+            app_env="development",
+            api_keys="dev-key",
+            jwt_jwks_url=None,
+            jwt_algorithm="HS256",
+        ),
+        role="test",
+    )

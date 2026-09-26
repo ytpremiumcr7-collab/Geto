@@ -49,6 +49,7 @@ def test_webhook_success_and_signature():
         assert headers["Content-Type"] == "application/json"
         expected = hmac.new(secret.encode(), content, hashlib.sha256).hexdigest()
         assert headers["X-Geoint-Signature"] == f"sha256={expected}"
+        assert headers["Idempotency-Key"] == "delivery-123"
         json.loads(content.decode())
         return mock_resp
 
@@ -57,11 +58,18 @@ def test_webhook_success_and_signature():
     mock_client.__aenter__ = AsyncMock(return_value=mock_client)
     mock_client.__aexit__ = AsyncMock(return_value=None)
 
-    with patch("app.alerts.notifiers.httpx.AsyncClient", return_value=mock_client):
+    with (
+        patch(
+            "app.alerts.ssrf.validate_webhook_url",
+            return_value="https://hooks.example.com/geoint",
+        ),
+        patch("app.alerts.notifiers.httpx.AsyncClient", return_value=mock_client),
+    ):
         r = asyncio.run(
             WebhookNotifier().send(
                 alert=alert,
                 channel_config={"url": "https://hooks.example.com/geoint", "secret": secret},
+                idempotency_key="delivery-123",
             )
         )
     assert r.ok

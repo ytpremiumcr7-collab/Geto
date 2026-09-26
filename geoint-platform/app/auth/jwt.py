@@ -98,14 +98,13 @@ class JWTService:
     def _decode_hs256(self, token: str) -> Principal:
         # P0: never verify with weak/default secrets (forged admin tokens)
         secret = _assert_hs256_secret_usable(self.secret)
-        options = {"require": ["exp", "sub"]}
         payload = jwt.decode(
             token,
             secret,
             algorithms=[self.algorithm],
             audience=self.audience,
             issuer=self.issuer,
-            options=options,
+            options={"require": ["exp", "sub"]},
         )
         return self._principal_from_payload(payload)
 
@@ -134,6 +133,7 @@ class JWTService:
         tenant_id = payload.get(tenant_claim) or payload.get("tenant_id")
         if not tenant_id:
             from app.core.config import settings as _s
+
             if getattr(_s, "app_env", "development") in ("production", "prod", "staging"):
                 raise ValueError("JWT missing required tenant claim")
             tenant_id = "default"

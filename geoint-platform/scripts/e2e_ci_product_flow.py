@@ -22,6 +22,7 @@ async def main() -> int:
     os.environ.setdefault("APP_ENV", "development")
     os.environ.setdefault("AUTH_DISABLED", "true")
 
+    from geoalchemy2.elements import WKTElement
     from httpx import ASGITransport, AsyncClient
     from sqlalchemy import select
 
@@ -30,6 +31,7 @@ async def main() -> int:
     from app.alerts.service import AlertService
     from app.db.session import SessionLocal
     from app.db.tenant import set_tenant
+    from app.geofencing.models import Geofence
     from app.main import app
 
     print("=== e2e_ci_product_flow ===")
@@ -68,6 +70,26 @@ async def main() -> int:
 
     async with SessionLocal() as session:
         await set_tenant(session, tenant)
+        fence = Geofence(
+            id=fence_id,
+            tenant_id=tenant,
+            name=f"e2e-fence-{fence_id}",
+            description="E2E alert fixture",
+            geometry=WKTElement(
+                "MULTIPOLYGON((("
+                "-99.20 19.30,-99.00 19.30,-99.00 19.50,"
+                "-99.20 19.50,-99.20 19.30"
+                ")))",
+                srid=4326,
+            ),
+            enabled=True,
+            metadata_={"fixture": "e2e_ci_product_flow"},
+        )
+        session.add(fence)
+        # GeofenceAlertRule has a DB-level composite FK that is not declared in ORM metadata.
+        # Flush explicitly so the referenced (tenant_id, geofence_id) exists before the rule.
+        await session.flush()
+
         ch = AlertChannel(
             id=channel_id,
             tenant_id=tenant,
@@ -112,9 +134,23 @@ async def main() -> int:
         )
         deliveries = list(result.scalars().all())
         assert deliveries, "expected deliveries"
-        d = deliveries[-1]
-        d.status = "sending"
-        out = await DeliveryService().process_one(session, d)
+
+        delivery_service = DeliveryService()
+        worker_id = "e2e-product-worker"
+        claimed = await delivery_service.claim_batch(
+            session,
+            worker_id=worker_id,
+            limit=20,
+        )
+        assert claimed, "expected a claimable delivery"
+        d = next((item for item in claimed if item.id == deliveries[-1].id), None)
+        assert d is not None, "expected emitted alert delivery to be claimed"
+
+        out = await delivery_service.process_one(
+            session,
+            delivery_id=d.id,
+            worker_id=worker_id,
+        )
         await session.commit()
         status = out.get("status") if isinstance(out, dict) else out
         assert status == "delivered" or d.status == "delivered", (status, d.status)

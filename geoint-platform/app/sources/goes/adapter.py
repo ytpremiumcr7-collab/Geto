@@ -10,9 +10,9 @@ import re
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
-from xml.etree import ElementTree
 
 import httpx
+from defusedxml import ElementTree
 
 from app.core.config import settings
 from app.domain.models import Observation
@@ -51,7 +51,9 @@ class GOESAdapter(SourceAdapter):
         self,
         product: str | None = None,
         max_keys: int = 15,
+        **kwargs: Any,
     ) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         product = product or self.product
         now = datetime.now(UTC)
         # Prefijo ABI: Product/year/doy/hour/

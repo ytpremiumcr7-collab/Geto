@@ -1,4 +1,5 @@
 """entity_type_filter must gate GeofenceAlert creation."""
+
 from __future__ import annotations
 
 import uuid

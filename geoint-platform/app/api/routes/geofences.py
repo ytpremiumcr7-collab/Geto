@@ -5,7 +5,6 @@ from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException
 from geoalchemy2.shape import from_shape
 from pydantic import BaseModel, Field
-from shapely.geometry import MultiPolygon, shape
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 

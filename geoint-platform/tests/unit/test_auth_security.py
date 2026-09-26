@@ -110,3 +110,97 @@ def test_topography_service_imports():
     from app.topography.service import TopographyService
 
     assert TopographyService is not None
+
+
+@pytest.mark.asyncio
+async def test_cookie_mode_keeps_jwt_out_of_response_body(monkeypatch):
+    from fastapi import Response
+    from starlette.requests import Request
+
+    from app.auth import router as auth_router
+    from app.core import config as cfg
+
+    async def allow_rate_limit(*args, **kwargs):
+        return True
+
+    monkeypatch.setattr(auth_router, "check_rate_limit", allow_rate_limit)
+    monkeypatch.setattr(cfg.settings, "app_env", "development")
+    monkeypatch.setattr(cfg.settings, "auth_cookie_mode", True)
+    monkeypatch.setattr(cfg.settings, "auth_cookie_secure", True)
+    monkeypatch.setattr(cfg.settings, "jwt_secret", "z" * 32)
+    monkeypatch.setattr(cfg.settings, "jwt_jwks_url", None)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/auth/token",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "https",
+            "server": ("testserver", 443),
+            "client": ("127.0.0.1", 12345),
+        }
+    )
+    response = Response()
+
+    result = await auth_router.issue_token(
+        request,
+        response,
+        auth_router.TokenRequest(
+            user_id="operator",
+            tenant_id="tenant-a",
+            roles=["operator"],
+        ),
+    )
+
+    assert result.cookie_mode is True
+    assert result.access_token is None
+    cookie = response.headers.get("set-cookie", "")
+    assert cfg.settings.auth_cookie_name in cookie
+    assert "HttpOnly" in cookie
+
+
+@pytest.mark.asyncio
+async def test_bearer_mode_still_returns_jwt(monkeypatch):
+    from fastapi import Response
+    from starlette.requests import Request
+
+    from app.auth import router as auth_router
+    from app.core import config as cfg
+
+    async def allow_rate_limit(*args, **kwargs):
+        return True
+
+    monkeypatch.setattr(auth_router, "check_rate_limit", allow_rate_limit)
+    monkeypatch.setattr(cfg.settings, "app_env", "development")
+    monkeypatch.setattr(cfg.settings, "auth_cookie_mode", False)
+    monkeypatch.setattr(cfg.settings, "jwt_secret", "y" * 32)
+    monkeypatch.setattr(cfg.settings, "jwt_jwks_url", None)
+
+    request = Request(
+        {
+            "type": "http",
+            "method": "POST",
+            "path": "/api/v1/auth/token",
+            "headers": [],
+            "query_string": b"",
+            "scheme": "http",
+            "server": ("testserver", 80),
+            "client": ("127.0.0.1", 12345),
+        }
+    )
+
+    result = await auth_router.issue_token(
+        request,
+        Response(),
+        auth_router.TokenRequest(
+            user_id="operator",
+            tenant_id="tenant-a",
+            roles=["operator"],
+        ),
+    )
+
+    assert result.cookie_mode is False
+    assert isinstance(result.access_token, str)
+    assert result.access_token

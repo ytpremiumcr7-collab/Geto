@@ -54,8 +54,9 @@ class MinIODropzoneAdapter(SourceAdapter):
         except Exception:
             return False
 
-    async def fetch(self, prefix: str | None = None, max_objects: int = 50) -> Any:
+    async def fetch(self, prefix: str | None = None, max_objects: int = 50, **kwargs: Any) -> Any:
         """Lista y descarga hasta max_objects del prefijo incoming."""
+        self._reject_unexpected_fetch_kwargs(kwargs)
         self._ensure_bucket()
         base = prefix or self.prefix_incoming
         objects = self.client.list_objects(self.bucket, prefix=base, recursive=True)

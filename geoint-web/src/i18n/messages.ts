@@ -45,7 +45,9 @@ const es = {
   getToken: "Obtener token",
 } as const;
 
-const en: { [K in keyof typeof es]: string } = {
+type Messages = { [K in keyof typeof es]: string };
+
+const en: Messages = {
   appName: "GEOINT Platform",
   login: "Sign in",
   logout: "Sign out",
@@ -90,7 +92,7 @@ const en: { [K in keyof typeof es]: string } = {
   getToken: "Get token",
 };
 
-const catalogs: Record<Locale, typeof es> = { es, en };
+const catalogs: Record<Locale, Messages> = { es, en };
 
 let current: Locale =
   (typeof localStorage !== "undefined" &&

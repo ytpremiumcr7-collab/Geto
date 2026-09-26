@@ -1,14 +1,15 @@
-"""Smoke: topography router imports and uses get_db (not get_session)."""
+"""Smoke: topography router imports and uses tenant-scoped DB sessions."""
 
 from pathlib import Path
 
 
-def test_routes_use_get_db():
+def test_routes_use_tenant_db():
     src = Path(__file__).resolve().parents[2] / "app/api/routes/topography.py"
     text = src.read_text()
     assert "get_session" not in text
-    assert "from app.db.session import get_db" in text
-    assert "Depends(get_db)" in text
+    assert "from app.db.session import get_db" not in text
+    assert "get_tenant_db" in text
+    assert "Depends(get_tenant_db)" in text
 
 
 def test_clip_bbox_exists():

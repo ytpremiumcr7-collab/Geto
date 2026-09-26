@@ -38,7 +38,9 @@ class CopernicusSTACAdapter(SourceAdapter):
         bbox: list[float] | None = None,
         datetime_range: str | None = None,
         limit: int = 20,
+        **kwargs: Any,
     ) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         payload = {
             "collections": [settings.copernicus_collection],
             "limit": limit,

@@ -16,7 +16,7 @@ cffi==2.1.1
 charset-normalizer==3.5.1
 click==8.5.0
 coverage==7.16.0
-cryptography==44.0.2
+cryptography==50.0.0
 cyclonedx-python-lib==9.1.0
 fastapi==0.141.1
 filelock==3.32.6
@@ -60,7 +60,7 @@ packageurl-python==0.17.6
 packaging==26.3
 pandas==2.3.3
 pathspec==1.1.1
-pillow==11.3.0
+pillow==12.3.0
 pip-api==0.0.35
 pip-audit==2.9.0
 pip-requirements-parser==32.0.1
@@ -103,9 +103,9 @@ pystac-ext-version==1.2.1
 pystac-ext-view==1.0.1
 pystac-ext-xarray-assets==1.0.1
 pystac==1.15.2
-pytest-asyncio==0.26.0
+pytest-asyncio==1.4.0
 pytest-cov==6.3.0
-pytest==8.4.2
+pytest==9.0.3
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.3
 pytz==2026.3.post1

@@ -63,7 +63,7 @@ def main() -> None:
 
     class H(BaseHTTPRequestHandler):
         def log_message(self, fmt: str, *a) -> None:  # noqa: A003
-            print("[%s] %s" % (self.log_date_time_string(), fmt % a))
+            print(f"[{self.log_date_time_string()}]", fmt, *a)
 
         def _json(self, code: int, obj: dict) -> None:
             body = json.dumps(obj).encode()

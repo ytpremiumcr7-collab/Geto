@@ -4,10 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 
 import structlog
 
-from app.db.session import SessionLocal
+from app.db.tenant import system_worker_session
 from app.messaging.jetstream import JetStreamClient
 from app.outbox.repository import OutboxRepository
 
@@ -41,7 +42,7 @@ class OutboxDispatcher:
             await self.js.close()
 
     async def process_batch(self) -> None:
-        async with SessionLocal() as session:
+        async with system_worker_session() as session:
             messages = await self.repo.claim(session, self.batch_size)
             for message in messages:
                 try:
@@ -52,9 +53,7 @@ class OutboxDispatcher:
                         rows = payload.get("rows") or []
                         tenant_id = payload.get("tenant_id") or "default"
                         if rows:
-                            await ClickHouseSink().write_observations(
-                                rows, tenant_id=tenant_id
-                            )
+                            await ClickHouseSink().write_observations(rows, tenant_id=tenant_id)
                         await self.repo.mark_published(session, message)
                         log.info(
                             "clickhouse_outbox_written",
@@ -88,6 +87,7 @@ async def main() -> None:
     from app.core.security_bootstrap import validate_settings
 
     configure_logging(settings.log_level)
+    os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     validate_settings(settings, role="outbox")
     dispatcher = OutboxDispatcher()
     await dispatcher.run()

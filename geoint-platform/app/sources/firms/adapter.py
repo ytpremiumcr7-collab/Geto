@@ -44,7 +44,8 @@ class NASAFIRMSAdapter(SourceAdapter):
         except Exception:
             return False
 
-    async def fetch(self) -> Any:
+    async def fetch(self, **kwargs: Any) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         if not settings.firms_map_key:
             raise RuntimeError("FIRMS_MAP_KEY is not configured")
 

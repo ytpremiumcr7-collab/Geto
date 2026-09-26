@@ -10,6 +10,10 @@ CREATE TABLE IF NOT EXISTS geoint.observations
     entity_id   String,
     entity_type LowCardinality(String),
     observed_at DateTime64(3, 'UTC'),
+    observation_id String DEFAULT hex(SHA256(concat(
+        tenant_id, '\\x1F', source_id, '\\x1F', entity_id, '\\x1F',
+        toString(toUnixTimestamp64Milli(observed_at))
+    ))),
     lon         Float64,
     lat         Float64,
     alt_m       Nullable(Float64),
@@ -19,6 +23,15 @@ ENGINE = MergeTree
 PARTITION BY toYYYYMM(observed_at)
 ORDER BY (tenant_id, source_id, observed_at, entity_id)
 TTL toDateTime(observed_at) + INTERVAL 180 DAY;
+
+-- Upgrade existing installations created before observation_id existed.
+-- The DEFAULT is evaluated for historical rows that do not yet have a stored value.
+ALTER TABLE geoint.observations
+    ADD COLUMN IF NOT EXISTS observation_id String DEFAULT hex(SHA256(concat(
+        tenant_id, '\\x1F', source_id, '\\x1F', entity_id, '\\x1F',
+        toString(toUnixTimestamp64Milli(observed_at))
+    )))
+    AFTER observed_at;
 
 CREATE TABLE IF NOT EXISTS geoint.alert_events
 (

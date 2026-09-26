@@ -40,7 +40,8 @@ class AISFileAdapter(SourceAdapter):
     async def health(self) -> bool:
         return self.path.is_file()
 
-    async def fetch(self, path: str | None = None) -> Any:
+    async def fetch(self, path: str | None = None, **kwargs: Any) -> Any:
+        self._reject_unexpected_fetch_kwargs(kwargs)
         target = Path(path) if path else self.path
         if not target.is_file():
             raise FileNotFoundError(f"AIS file not found: {target}")
@@ -67,7 +68,7 @@ class AISFileAdapter(SourceAdapter):
                 yield obs
 
     async def _from_geojson(self, data: Any, received_at: datetime) -> AsyncIterator[Observation]:
-        features = []
+        features: list[dict[str, Any]] = []
         if isinstance(data, dict) and data.get("type") == "FeatureCollection":
             features = data.get("features") or []
         elif isinstance(data, dict) and data.get("type") == "Feature":

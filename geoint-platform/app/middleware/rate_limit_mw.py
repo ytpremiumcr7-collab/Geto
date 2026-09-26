@@ -7,6 +7,7 @@ Also keys by Authorization subject hash when available to reduce shared-NAT coll
 from __future__ import annotations
 
 import hashlib
+import ipaddress
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -16,14 +17,39 @@ from app.core.config import settings
 from app.infrastructure.rate_limit import check_rate_limit
 
 
+def _trusted_proxy_networks() -> tuple[ipaddress.IPv4Network | ipaddress.IPv6Network, ...]:
+    networks: list[ipaddress.IPv4Network | ipaddress.IPv6Network] = []
+    for raw in (getattr(settings, "trusted_proxy_cidrs", "") or "").split(","):
+        value = raw.strip()
+        if not value:
+            continue
+        try:
+            networks.append(ipaddress.ip_network(value, strict=False))
+        except ValueError:
+            continue
+    return tuple(networks)
+
+
 def _client_ip(request: Request) -> str:
-    xff = request.headers.get("x-forwarded-for") or request.headers.get("X-Forwarded-For")
-    if xff:
-        # leftmost = original client when proxy appends
-        return xff.split(",")[0].strip() or "unknown"
-    if request.client:
-        return request.client.host or "unknown"
-    return "unknown"
+    peer = request.client.host if request.client and request.client.host else "unknown"
+    try:
+        peer_ip = ipaddress.ip_address(peer)
+    except ValueError:
+        return peer
+
+    trusted = any(peer_ip in network for network in _trusted_proxy_networks())
+    if not trusted:
+        return peer
+
+    xff = request.headers.get("x-forwarded-for")
+    if not xff:
+        return peer
+
+    candidate = xff.split(",")[0].strip()
+    try:
+        return str(ipaddress.ip_address(candidate))
+    except ValueError:
+        return peer
 
 
 def _identity_suffix(request: Request) -> str:

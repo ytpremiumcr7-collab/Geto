@@ -6,15 +6,15 @@ import hashlib
 import hmac
 import logging
 
-from fastapi import Depends, Request, HTTPException, Security, status
+from fastapi import Depends, HTTPException, Request, Security, status
 from fastapi.security import APIKeyHeader, HTTPAuthorizationCredentials, HTTPBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth.jwt import JWTService
 from app.auth.models import Principal
+from app.core.config import settings
 from app.db.session import get_db
 from app.db.tenant import set_system_worker, set_tenant
-from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.config import settings
 
 log = logging.getLogger(__name__)
 
@@ -166,7 +166,6 @@ def require_roles(*roles: str):
         )
 
     return _checker
-
 
 
 async def get_tenant_db(

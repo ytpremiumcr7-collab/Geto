@@ -1,4 +1,3 @@
-from app.db.tenant import set_system_worker
 """Scheduler de SourceJobs: claim + publish a JetStream."""
 
 from __future__ import annotations
@@ -13,7 +12,7 @@ import structlog
 
 from app.core.config import settings
 from app.core.logging import configure_logging
-from app.db.session import SessionLocal
+from app.db.tenant import system_worker_session, tenant_session
 from app.jobs.repository import JobRepository
 from app.messaging.jetstream import JetStreamClient
 
@@ -51,11 +50,7 @@ class JobScheduler:
             await self.js.close()
 
     async def tick(self) -> None:
-        async with SessionLocal() as session:
-            # RLS: workers use reserved tenant marker so FORCE RLS policies allow claim
-            from sqlalchemy import text
-
-            await set_system_worker(session)
+        async with system_worker_session() as session:
             jobs = await self.repo.claim_due_jobs(
                 session,
                 worker_id=self.worker_id,
@@ -82,7 +77,8 @@ class JobScheduler:
                     job_id=str(job.id),
                     source=job.source_id,
                 )
-                async with SessionLocal() as session:
+                tenant_id = getattr(job, "tenant_id", None) or "default"
+                async with tenant_session(tenant_id) as session:
                     await self.repo.mark_failure(session, job.id, str(exc))
 
     def stop(self) -> None:
@@ -91,6 +87,7 @@ class JobScheduler:
 
 async def main() -> None:
     import os
+
     os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     configure_logging(settings.log_level)
     from app.core.security_bootstrap import validate_settings

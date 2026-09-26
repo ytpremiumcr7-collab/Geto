@@ -9,13 +9,15 @@ from uuid import UUID
 
 import nats
 import structlog
+from nats.aio.client import Client as NATSClient
 from nats.aio.msg import Msg
+from nats.js import JetStreamContext
 from nats.js.api import AckPolicy, ConsumerConfig, DeliverPolicy
 
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.models_dlq import DlqMessage
-from app.db.session import SessionLocal
+from app.db.tenant import system_worker_session, tenant_session
 from app.ingestion.dispatcher import SourceDispatcher
 from app.jobs.repository import IdempotencyRepository, JobRepository
 from app.messaging.jetstream import JetStreamClient
@@ -31,8 +33,8 @@ class SourceWorker:
         self.queue = os.getenv("NATS_QUEUE_GROUP", "geoint-workers")
         self.ack_wait = int(os.getenv("NATS_ACK_WAIT_SECONDS", "60"))
         self.max_deliver = int(os.getenv("NATS_MAX_DELIVER", "5"))
-        self.nc = None
-        self.js = None
+        self.nc: NATSClient | None = None
+        self.js: JetStreamContext | None = None
         self.dispatcher = SourceDispatcher()
         self.jobs = JobRepository()
         self.idempotency = IdempotencyRepository()
@@ -40,17 +42,19 @@ class SourceWorker:
         self._running = True
 
     async def start(self) -> None:
-        self.nc = await nats.connect(self.nats_url, name="geoint-source-worker")
-        self.js = self.nc.jetstream()
+        nc = await nats.connect(self.nats_url, name="geoint-source-worker")
+        js = nc.jetstream()
+        self.nc = nc
+        self.js = js
         await self.dlq.connect()
 
         # Asegurar stream de jobs (idempotente)
         try:
-            await self.js.stream_info(settings.nats_stream)
+            await js.stream_info(settings.nats_stream)
         except Exception:
             from nats.js.api import RetentionPolicy, StorageType, StreamConfig
 
-            await self.js.add_stream(
+            await js.add_stream(
                 StreamConfig(
                     name=settings.nats_stream,
                     subjects=[f"{JOBS_PREFIX}.>", "geoint.observation.>", "geoint.event.>"],
@@ -70,7 +74,7 @@ class SourceWorker:
             filter_subject=f"{JOBS_PREFIX}.>",
         )
 
-        sub = await self.js.pull_subscribe(
+        sub = await js.pull_subscribe(
             subject=f"{JOBS_PREFIX}.>",
             durable=self.durable,
             config=config,
@@ -84,18 +88,26 @@ class SourceWorker:
             max_deliver=self.max_deliver,
         )
 
-        while self._running:
-            try:
-                messages = await sub.fetch(batch=5, timeout=5)
-            except nats.errors.TimeoutError:
-                continue
-            except Exception:
-                log.exception("fetch_failed")
-                await asyncio.sleep(1)
-                continue
+        try:
+            while self._running:
+                try:
+                    messages = await sub.fetch(batch=5, timeout=5)
+                except nats.errors.TimeoutError:
+                    continue
+                except Exception:
+                    log.exception("fetch_failed")
+                    await asyncio.sleep(1)
+                    continue
 
-            for msg in messages:
-                await self.handle(msg)
+                for msg in messages:
+                    await self.handle(msg)
+        finally:
+            await self.dlq.close()
+            if self.nc is not None:
+                await self.nc.drain()
+            self.nc = None
+            self.js = None
+            log.info("worker_stopped")
 
     async def handle(self, msg: Msg) -> None:
         delivery = int(msg.metadata.num_delivered) if msg.metadata else 1
@@ -117,9 +129,10 @@ class SourceWorker:
 
             # Atomic claim BEFORE side effects (processing lease)
             worker_id = f"{self.durable}:{os.getpid()}"
-            async with SessionLocal() as session:
+            async with system_worker_session() as session:
                 claim = await self.idempotency.try_claim(
                     session,
+                    tenant_id=tenant_id,
                     message_id=message_id,
                     subject=subject,
                     source_id=source_id,
@@ -137,7 +150,7 @@ class SourceWorker:
 
             # We own the lease — execute side effects
             try:
-                async with SessionLocal() as session:
+                async with tenant_session(tenant_id) as session:
                     await self.dispatcher.execute(
                         session,
                         source_id=source_id,
@@ -147,17 +160,27 @@ class SourceWorker:
                         job_id=str(job_id),
                         message_id=message_id,
                     )
+                # dispatcher commits its ingestion transaction. SET LOCAL RLS
+                # context is cleared by that commit, so job state must use a
+                # freshly tenant-bound transaction.
+                async with tenant_session(tenant_id) as session:
                     await self.jobs.mark_success(session, job_id)
-                async with SessionLocal() as session:
+                async with system_worker_session() as session:
                     await self.idempotency.mark_completed(
-                        session, message_id=message_id, worker_id=worker_id
+                        session,
+                        tenant_id=tenant_id,
+                        message_id=message_id,
+                        worker_id=worker_id,
                     )
                 await msg.ack()
                 log.info("job_ok", job_id=str(job_id), source=source_id, delivery=delivery)
             except Exception:
-                async with SessionLocal() as session:
+                async with system_worker_session() as session:
                     await self.idempotency.mark_failed(
-                        session, message_id=message_id, worker_id=worker_id
+                        session,
+                        tenant_id=tenant_id,
+                        message_id=message_id,
+                        worker_id=worker_id,
                     )
                 raise
 
@@ -176,10 +199,11 @@ class SourceWorker:
                         error=str(exc),
                         delivery_count=delivery,
                     )
-                    async with SessionLocal() as session:
+                    dlq_tenant_id = body.get("tenant_id") or "default"
+                    async with tenant_session(dlq_tenant_id) as session:
                         session.add(
                             DlqMessage(
-                                tenant_id=body.get("tenant_id") or "default",
+                                tenant_id=dlq_tenant_id,
                                 source_id=source_id,
                                 original_subject=subject,
                                 payload=body,
@@ -191,7 +215,7 @@ class SourceWorker:
                         await session.commit()
                     job_id_raw = body.get("job_id")
                     if job_id_raw:
-                        async with SessionLocal() as session:
+                        async with tenant_session(dlq_tenant_id) as session:
                             await self.jobs.mark_failure(session, UUID(job_id_raw), str(exc))
                 except Exception:
                     log.exception("dlq_publish_failed")
@@ -202,7 +226,8 @@ class SourceWorker:
             try:
                 body = json.loads(msg.data.decode()) if msg.data else {}
                 if body.get("job_id"):
-                    async with SessionLocal() as session:
+                    retry_tenant_id = body.get("tenant_id") or "default"
+                    async with tenant_session(retry_tenant_id) as session:
                         await self.jobs.mark_failure(session, UUID(body["job_id"]), str(exc))
             except Exception:
                 pass
@@ -214,6 +239,7 @@ class SourceWorker:
 
 async def main() -> None:
     import os
+
     os.environ.setdefault("GEOINT_SYSTEM_WORKER", "1")
     import signal
 

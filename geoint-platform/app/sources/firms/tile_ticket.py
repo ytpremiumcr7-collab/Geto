@@ -19,11 +19,7 @@ DEFAULT_TTL_S = 15 * 60  # 15 minutes
 
 
 def _secret() -> bytes:
-    raw = (
-        getattr(settings, "firms_tile_hmac_secret", None)
-        or settings.jwt_secret
-        or ""
-    ).strip()
+    raw = (getattr(settings, "firms_tile_hmac_secret", None) or settings.jwt_secret or "").strip()
     if not raw:
         # Deterministic lab fallback only when auth_disabled / empty secret —
         # production bootstrap should already require jwt material.
@@ -40,7 +36,7 @@ def issue_ticket(
     exp = int(time.time()) + max(60, ttl_s)
     body = f"{tenant_id}|{user_id}|{exp}"
     sig = hmac.new(_secret(), body.encode("utf-8"), hashlib.sha256).hexdigest()
-    token = base64.urlsafe_b64encode(f"{body}|{sig}".encode("utf-8")).decode("ascii")
+    token = base64.urlsafe_b64encode(f"{body}|{sig}".encode()).decode("ascii")
     return token, exp
 
 

@@ -12,7 +12,6 @@ from shapely.geometry import Point
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.analytics.clickhouse import ClickHouseSink
 from app.core.config import settings
 from app.correlation.engine import CorrelationEngine
 from app.db.models import Observation as ObservationModel
@@ -229,12 +228,6 @@ class SourceDispatcher:
             inserted=inserted,
             job_type=job_type,
         )
-        # Best-effort immediate write; outbox dispatcher retries if this fails
-        if getattr(settings, "clickhouse_enabled", False) and ch_rows:
-            try:
-                await ClickHouseSink().write_observations(ch_rows, tenant_id=tenant_id)
-            except Exception:
-                log.exception("clickhouse_write_failed_will_retry_via_outbox")
         return inserted
 
     async def _insert_observation(
@@ -280,6 +273,7 @@ class SourceDispatcher:
             .on_conflict_do_nothing(
                 constraint="uq_observations_tenant_source_entity_time",
             )
+            .returning(ObservationModel.id)
         )
         result = await session.execute(stmt)
-        return (result.rowcount or 0) > 0
+        return result.scalar_one_or_none() is not None
