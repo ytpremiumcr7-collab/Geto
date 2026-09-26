@@ -8,6 +8,7 @@ from app.analytics.clickhouse import QUERY_TEMPLATES, ClickHouseClient
 from app.auth.dependencies import get_current_principal, require_roles
 from app.auth.models import Principal
 from app.core.config import settings
+from app.policies.source_access import readable_source_ids
 
 router = APIRouter(prefix="/api/v1/analytics", tags=["analytics"])
 
@@ -30,7 +31,11 @@ async def run_template(
     if template_id not in QUERY_TEMPLATES:
         raise HTTPException(status_code=404, detail=f"Unknown template: {template_id}")
     client = ClickHouseClient()
-    result = await client.query(template_id, tenant_id=principal.tenant_id)
+    result = await client.query(
+        template_id,
+        tenant_id=principal.tenant_id,
+        allowed_source_ids=readable_source_ids(principal),
+    )
     result["tenant_id"] = principal.tenant_id
     return result
 
