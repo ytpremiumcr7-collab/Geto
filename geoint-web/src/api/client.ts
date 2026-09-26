@@ -81,6 +81,12 @@ export type GeofenceRow = {
   geometry?: GeoJSON.Geometry | null;
 };
 
+export async function fetchOidcStatus() {
+  return api<{ enabled: boolean; development_bootstrap: boolean }>(
+    "/api/v1/auth/oidc/status"
+  );
+}
+
 export async function issueToken(body: {
   user_id: string;
   tenant_id: string;
