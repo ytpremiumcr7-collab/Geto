@@ -67,11 +67,14 @@ async def _wait_pipeline(job_id: UUID, *, min_runs: int = 1, timeout: float = 30
             job = await session.get(SourceJob, job_id)
             observation = (
                 await session.execute(
-                    select(Observation).where(
+                    select(Observation)
+                    .where(
                         Observation.tenant_id == TENANT_ID,
                         Observation.source_id == "readsb_local",
                         Observation.entity_id == f"icao24:{HEX_ID}",
                     )
+                    .order_by(Observation.observed_at.desc())
+                    .limit(1)
                 )
             ).scalar_one_or_none()
             runs = list(
