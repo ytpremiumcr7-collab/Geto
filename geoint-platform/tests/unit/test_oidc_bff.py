@@ -24,6 +24,7 @@ def test_oidc_start_uses_authorization_code_pkce(monkeypatch):
     monkeypatch.setattr(cfg.settings, "oidc_client_id", "geto-web")
     monkeypatch.setattr(cfg.settings, "oidc_redirect_uri", "https://geto.example/api/v1/auth/oidc/callback")
     monkeypatch.setattr(cfg.settings, "oidc_scopes", "openid profile email")
+    monkeypatch.setattr(cfg.settings, "jwt_jwks_url", "https://idp.example/jwks")
 
     store = _StateStore()
     service = OIDCService(state_store=store)
