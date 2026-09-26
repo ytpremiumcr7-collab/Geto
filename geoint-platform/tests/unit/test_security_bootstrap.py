@@ -26,6 +26,10 @@ def _settings(**kwargs):
         auth_bootstrap_secret=None,
         trusted_hosts="api.example.com",
         api_keys="",
+        auth_cookie_mode=True,
+        auth_cookie_secure=True,
+        oidc_client_id="geto-web",
+        oidc_redirect_uri="https://app.example.com/api/v1/auth/oidc/callback",
     )
     base.update(kwargs)
     return SimpleNamespace(**base)
@@ -35,6 +39,27 @@ def test_production_ok_with_oidc():
     from app.core.security_bootstrap import validate_settings
 
     validate_settings(_settings(), role="test")
+
+
+def test_production_rejects_missing_browser_oidc_client():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="OIDC_CLIENT_ID"):
+        validate_settings(_settings(oidc_client_id=None), role="test")
+
+
+def test_production_rejects_browser_auth_without_http_only_cookie_mode():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="AUTH_COOKIE_MODE"):
+        validate_settings(_settings(auth_cookie_mode=False), role="test")
+
+
+def test_production_rejects_insecure_auth_cookie():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="AUTH_COOKIE_SECURE"):
+        validate_settings(_settings(auth_cookie_secure=False), role="test")
 
 
 def test_production_rejects_missing_jwks():
