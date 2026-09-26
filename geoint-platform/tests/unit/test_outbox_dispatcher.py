@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+import json
+from contextlib import asynccontextmanager
+from types import SimpleNamespace
+from uuid import uuid4
+
+import pytest
+
+from app.outbox import dispatcher as dispatcher_mod
+
+
+class FakeSession:
+    pass
+
+
+@asynccontextmanager
+async def fake_system_session():
+    yield FakeSession()
+
+
+class FakeRepo:
+    def __init__(self, messages):
+        self.messages = messages
+        self.claim_calls = []
+        self.published = []
+        self.failures = []
+
+    async def claim(self, _session, **kwargs):
+        self.claim_calls.append(kwargs)
+        return self.messages
+
+    async def mark_published(self, _session, **kwargs):
+        self.published.append(kwargs)
+        return True
+
+    async def persist_failure(self, _session, **kwargs):
+        self.failures.append(kwargs)
+        return True
+
+
+class FakeJsContext:
+    def __init__(self, error: Exception | None = None):
+        self.calls = []
+        self.error = error
+
+    async def publish(self, subject, payload, headers=None):
+        self.calls.append((subject, json.loads(payload.decode()), headers))
+        if self.error:
+            raise self.error
+
+
+class FakeJetStream:
+    def __init__(self, error: Exception | None = None):
+        self.js = FakeJsContext(error)
+
+
+def _message():
+    return SimpleNamespace(
+        id=uuid4(),
+        tenant_id="tenant-a",
+        subject="geoint.event.tenant-a",
+        payload={"tenant_id": "tenant-a", "source_id": "usgs_earthquake"},
+    )
+
+
+@pytest.mark.asyncio
+async def test_outbox_dispatcher_publishes_with_outbox_idempotency_key(monkeypatch):
+    monkeypatch.setattr(dispatcher_mod, "system_worker_session", fake_system_session)
+    message = _message()
+    dispatcher = dispatcher_mod.OutboxDispatcher()
+    dispatcher.repo = FakeRepo([message])
+    dispatcher.js = FakeJetStream()
+
+    await dispatcher.process_batch()
+
+    assert dispatcher.js.js.calls[0][2] == {"Nats-Msg-Id": str(message.id)}
+    assert dispatcher.repo.published[0]["message_id"] == message.id
+    assert dispatcher.repo.failures == []
+
+
+@pytest.mark.asyncio
+async def test_outbox_dispatcher_persists_failure_for_bounded_retry(monkeypatch):
+    monkeypatch.setattr(dispatcher_mod, "system_worker_session", fake_system_session)
+    message = _message()
+    dispatcher = dispatcher_mod.OutboxDispatcher()
+    dispatcher.repo = FakeRepo([message])
+    dispatcher.js = FakeJetStream(RuntimeError("nats unavailable"))
+
+    await dispatcher.process_batch()
+
+    assert dispatcher.repo.published == []
+    assert dispatcher.repo.failures[0]["message_id"] == message.id
+    assert dispatcher.repo.failures[0]["error"] == "nats unavailable"
