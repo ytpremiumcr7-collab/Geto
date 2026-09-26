@@ -60,6 +60,7 @@ class JetStreamClient:
         self,
         *,
         job_id: UUID,
+        execution_id: UUID,
         source_id: str,
         job_type: str,
         config: dict[str, Any],
@@ -68,6 +69,7 @@ class JetStreamClient:
         assert self.js is not None
         payload = {
             "job_id": str(job_id),
+            "execution_id": str(execution_id),
             "source_id": source_id,
             "job_type": job_type,
             "config": config or {},
@@ -77,7 +79,7 @@ class JetStreamClient:
         await self.js.publish(
             subject,
             json.dumps(payload, default=str).encode(),
-            headers={"Nats-Msg-Id": str(job_id)},
+            headers={"Nats-Msg-Id": str(execution_id)},
         )
 
     async def publish_dlq(
