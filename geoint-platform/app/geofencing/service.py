@@ -7,6 +7,7 @@ from typing import Any
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.events.repository import EventRepository
 from app.geofencing.repository import GeofenceRepository
 from app.outbox.repository import OutboxRepository
 
@@ -113,6 +114,18 @@ class GeofenceService:
                     subject=f"geoint.event.{tenant_id}",
                     payload=event,
                     tenant_id=tenant_id,
+                )
+
+        if events and source_id:
+            event_repo = EventRepository(session)
+            for event in events:
+                await event_repo.append(
+                    tenant_id=tenant_id,
+                    source_id=source_id,
+                    event_type=str(event["event_type"]),
+                    entity_id=entity_id,
+                    occurred_at=observed_at,
+                    payload=event,
                 )
 
         # Alert materialization participates in the same DB transaction as
