@@ -225,6 +225,11 @@ class SourceDispatcher:
                 tenant_id=tenant_id,
             )
         await session.commit()
+        # Source lifecycle acknowledgements (e.g. moving MinIO dropzone
+        # objects) happen only after the authoritative Postgres transaction is
+        # durable. A failure here leaves the execution uncompleted so the worker
+        # can retry the acknowledgement without losing source input.
+        await adapter.after_commit(raw)
         log.info(
             "dispatch_ok",
             source=source_id,
