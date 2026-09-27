@@ -91,10 +91,13 @@ async def _wait_pipeline(job_id: UUID, *, min_runs: int = 1, timeout: float = 30
             )
             outbox = (
                 await session.execute(
-                    select(OutboxMessage).where(
+                    select(OutboxMessage)
+                    .where(
                         OutboxMessage.tenant_id == TENANT_ID,
                         OutboxMessage.subject == "geoint.ingestion.readsb_local.completed",
                     )
+                    .order_by(OutboxMessage.created_at.desc())
+                    .limit(1)
                 )
             ).scalar_one_or_none()
 
@@ -172,7 +175,9 @@ async def main() -> int:
                             ProcessedMessage.source_id == "readsb_local",
                         )
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
         assert len(processed_rows) == 1
         assert processed_rows[0].status == "completed"
@@ -214,7 +219,9 @@ async def main() -> int:
                             ProcessedMessage.source_id == "readsb_local",
                         )
                     )
-                ).scalars().all()
+                )
+                .scalars()
+                .all()
             )
         assert len(processed_rows) == 2
         assert len({row.message_id for row in processed_rows}) == 2
