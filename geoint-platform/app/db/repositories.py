@@ -132,10 +132,7 @@ class ObservationRepository:
             return None
 
         latest_result = await self.session.execute(
-            select(Observation)
-            .where(*conditions)
-            .order_by(Observation.observed_at.desc())
-            .limit(1)
+            select(Observation).where(*conditions).order_by(Observation.observed_at.desc()).limit(1)
         )
         latest = latest_result.scalar_one_or_none()
         if latest is None:
