@@ -44,3 +44,19 @@ def test_realtime_delivery_respects_source_scope():
     asyncio.run(scenario())
 
     assert [item["entity_id"] for item in ws.sent] == ["ok"]
+
+
+def test_realtime_drops_payload_without_source_provenance():
+    manager = ConnectionManager()
+    ws = _FakeWebSocket()
+
+    async def scenario():
+        await manager.connect("tenant-a", ws, allowed_source_ids={"usgs_earthquake"})
+        await manager.publish(
+            "tenant-a",
+            {"event_type": "legacy-event", "entity_id": "unknown-source"},
+        )
+
+    asyncio.run(scenario())
+
+    assert ws.sent == []
