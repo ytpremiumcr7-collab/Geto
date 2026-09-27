@@ -59,7 +59,9 @@ class ConnectionManager:
 
         dead: list[WebSocket] = []
         for ws, allowed_sources in targets:
-            if source_id and source_id not in allowed_sources:
+            # Realtime event/alert payloads are source-scoped. Missing provenance
+            # is denied rather than broadcast to every tenant socket.
+            if not source_id or source_id not in allowed_sources:
                 continue
             try:
                 await ws.send_json(payload)
