@@ -13,6 +13,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.auth.jwt import JWTService
 from app.core.config import settings
+from app.core.security_bootstrap import cors_origin_list
 from app.policies.source_access import readable_source_ids
 from app.realtime.manager import manager
 
@@ -30,12 +31,24 @@ def _token_from_header(websocket: WebSocket) -> str | None:
     return None
 
 
+def _cookie_origin_allowed(websocket: WebSocket) -> bool:
+    env = (settings.app_env or "development").strip().lower()
+    if env not in ("production", "prod", "staging"):
+        return True
+    origin = (websocket.headers.get("origin") or "").strip()
+    if not origin:
+        return False
+    return origin in cors_origin_list(settings)
+
+
 def _token_from_cookie(websocket: WebSocket) -> str | None:
     if not settings.auth_cookie_mode:
         return None
     cookie_name = settings.auth_cookie_name or "geoint_access"
     raw = websocket.cookies.get(cookie_name)
-    return raw.strip() if raw and raw.strip() else None
+    if not raw or not raw.strip():
+        return None
+    return raw.strip()
 
 
 @router.websocket("/ws/events")
@@ -49,6 +62,14 @@ async def events_websocket(websocket: WebSocket):
     principal = None
 
     if cookie_token and not header_token:
+        if not _cookie_origin_allowed(websocket):
+            log.warning(
+                "ws_cookie_origin_rejected",
+                client=client,
+                origin=(websocket.headers.get("origin") or "")[:300],
+            )
+            await websocket.close(code=4403)
+            return
         auth_mode = "cookie"
 
     if query_token and not token:
