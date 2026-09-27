@@ -26,9 +26,7 @@ def test_main_stream_covers_all_product_subjects():
 
     asyncio.run(client.ensure_streams())
 
-    main = next(
-        cfg for cfg in fake.configs if "geoint.jobs.>" in cfg.subjects
-    )
+    main = next(cfg for cfg in fake.configs if "geoint.jobs.>" in cfg.subjects)
     assert "geoint.event.>" in main.subjects
     assert "geoint.alert.>" in main.subjects
     assert "geoint.ingestion.>" in main.subjects
