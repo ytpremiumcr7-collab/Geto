@@ -12,6 +12,7 @@ import structlog
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
 from app.auth.jwt import JWTService
+from app.core.config import settings
 from app.policies.source_access import readable_source_ids
 from app.realtime.manager import manager
 
@@ -29,19 +30,30 @@ def _token_from_header(websocket: WebSocket) -> str | None:
     return None
 
 
+def _token_from_cookie(websocket: WebSocket) -> str | None:
+    if not settings.auth_cookie_mode:
+        return None
+    cookie_name = settings.auth_cookie_name or "geoint_access"
+    raw = websocket.cookies.get(cookie_name)
+    return raw.strip() if raw and raw.strip() else None
+
+
 @router.websocket("/ws/events")
 async def events_websocket(websocket: WebSocket):
-    token = _token_from_header(websocket)
+    header_token = _token_from_header(websocket)
+    cookie_token = _token_from_cookie(websocket)
+    token = header_token or cookie_token
     query_token = websocket.query_params.get("token")
     client = websocket.client.host if websocket.client else "unknown"
     auth_mode = "none"
     principal = None
 
-    if query_token and not token:
-        from app.core.config import settings as _settings
+    if cookie_token and not header_token:
+        auth_mode = "cookie"
 
-        if getattr(_settings, "app_env", "development") in ("production", "prod", "staging"):
-            log.warning("ws_query_token_rejected", client=client, env=_settings.app_env)
+    if query_token and not token:
+        if getattr(settings, "app_env", "development") in ("production", "prod", "staging"):
+            log.warning("ws_query_token_rejected", client=client, env=settings.app_env)
             await websocket.close(code=4401)
             return
         log.warning("ws_query_token_deprecated", client=client)
@@ -49,7 +61,8 @@ async def events_websocket(websocket: WebSocket):
         auth_mode = "query_deprecated"
 
     if token:
-        auth_mode = "header_or_query"
+        if auth_mode == "none":
+            auth_mode = "header_or_query"
         try:
             principal = JWTService().decode(token)
         except Exception as e:
@@ -92,8 +105,6 @@ async def events_websocket(websocket: WebSocket):
             )
             await websocket.close(code=4401)
             return
-        await websocket.send_json({"type": "auth_ok", "tenant_id": principal.tenant_id})
-
     tenant_id = principal.tenant_id
     user_id = principal.user_id
     await manager.connect(
@@ -101,6 +112,7 @@ async def events_websocket(websocket: WebSocket):
         websocket,
         allowed_source_ids=readable_source_ids(principal),
     )
+    await websocket.send_json({"type": "auth_ok", "tenant_id": tenant_id})
     log.info(
         "ws_connected",
         tenant_id=tenant_id,
