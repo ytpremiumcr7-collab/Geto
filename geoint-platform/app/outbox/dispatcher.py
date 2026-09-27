@@ -101,7 +101,6 @@ class OutboxDispatcher:
                     error=str(exc),
                 )
 
-
     def stop(self) -> None:
         self._running = False
 
