@@ -34,9 +34,7 @@ def test_outbox_failure_schedules_exponential_retry_and_releases_lease():
 def test_outbox_failure_dead_letters_after_max_attempts():
     message = _message(4)
 
-    OutboxRepository().mark_failed(
-        message, "still down", max_attempts=5, base_backoff_seconds=10
-    )
+    OutboxRepository().mark_failed(message, "still down", max_attempts=5, base_backoff_seconds=10)
 
     assert message.attempts == 5
     assert message.dead_lettered_at is not None
