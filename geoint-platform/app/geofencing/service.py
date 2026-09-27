@@ -8,6 +8,7 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.repository import EventRepository
+from app.events.repository import EventRepository
 from app.geofencing.repository import GeofenceRepository
 from app.outbox.repository import OutboxRepository
 
@@ -76,6 +77,15 @@ class GeofenceService:
                     },
                 }
                 events.append(event)
+                if source_id:
+                    await EventRepository(session).append(
+                        tenant_id=tenant_id,
+                        source_id=source_id,
+                        event_type=event["event_type"],
+                        entity_id=entity_id,
+                        occurred_at=observed_at,
+                        payload=event,
+                    )
                 await outbox.enqueue(
                     session,
                     subject=f"geoint.event.{tenant_id}",
@@ -109,6 +119,15 @@ class GeofenceService:
                     },
                 }
                 events.append(event)
+                if source_id:
+                    await EventRepository(session).append(
+                        tenant_id=tenant_id,
+                        source_id=source_id,
+                        event_type=event["event_type"],
+                        entity_id=entity_id,
+                        occurred_at=observed_at,
+                        payload=event,
+                    )
                 await outbox.enqueue(
                     session,
                     subject=f"geoint.event.{tenant_id}",
