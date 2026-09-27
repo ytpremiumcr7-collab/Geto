@@ -8,7 +8,6 @@ from typing import Any
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.events.repository import EventRepository
-from app.events.repository import EventRepository
 from app.geofencing.repository import GeofenceRepository
 from app.outbox.repository import OutboxRepository
 
