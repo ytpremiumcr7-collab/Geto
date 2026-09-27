@@ -332,7 +332,6 @@ class SourceWorker:
             # parallel retry while the broker is redelivering it.
             await msg.nak()
 
-
     def stop(self) -> None:
         self._running = False
 
