@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 import structlog
 from geoalchemy2.shape import from_shape
@@ -33,7 +34,12 @@ log = structlog.get_logger()
 
 
 # Argumentos de fetch por fuente (sin kwargs ciegos).
-def _fetch_kwargs(source_id: str, config: dict[str, Any]) -> dict[str, Any]:
+def _fetch_kwargs(
+    source_id: str,
+    config: dict[str, Any],
+    *,
+    tenant_id: str = "default",
+) -> dict[str, Any]:
     if source_id == "opensky":
         return {
             "lamin": config.get("lamin", settings.default_aoi_south),
@@ -69,8 +75,18 @@ def _fetch_kwargs(source_id: str, config: dict[str, Any]) -> dict[str, Any]:
             "step": config.get("step", "1 d"),
         }
     if source_id == "minio_dropzone":
+        tenant_segment = quote(str(tenant_id).strip(), safe="-_.~")
+        tenant_root = (
+            f"{settings.dropzone_prefix_incoming.rstrip('/')}/{tenant_segment}/"
+        )
+        requested = str(config.get("prefix") or tenant_root)
+        if not requested.startswith(tenant_root):
+            raise ValueError(
+                "minio_dropzone prefix must remain inside the tenant dropzone "
+                f"{tenant_root!r}"
+            )
         return {
-            "prefix": config.get("prefix"),
+            "prefix": requested,
             "max_objects": int(config.get("max_objects", 50)),
         }
     # usgs_earthquake, nasa_firms: sin kwargs
@@ -102,7 +118,7 @@ class SourceDispatcher:
         breaker = get_breaker(source_id)
         breaker.before_call()
 
-        kwargs = _fetch_kwargs(source_id, config)
+        kwargs = _fetch_kwargs(source_id, config, tenant_id=tenant_id)
         try:
 
             @retryable()
