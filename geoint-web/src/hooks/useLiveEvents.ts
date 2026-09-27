@@ -21,7 +21,6 @@ export function useLiveEvents(enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const token = getToken();
-    if (!token) return;
 
     const proto = window.location.protocol === "https:" ? "wss" : "ws";
     const host = window.location.host;
@@ -30,7 +29,13 @@ export function useLiveEvents(enabled: boolean) {
     wsRef.current = ws;
 
     ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "auth", token }));
+      // Browser WebSocket APIs cannot set Authorization headers. In production
+      // cookie/BFF mode the HttpOnly session cookie rides the handshake, so no
+      // token message is needed (or exposed to JavaScript). Development bearer
+      // mode still authenticates with the first message.
+      if (token) {
+        ws.send(JSON.stringify({ type: "auth", token }));
+      }
     };
     ws.onclose = () => setConnected(false);
     ws.onerror = () => setConnected(false);
