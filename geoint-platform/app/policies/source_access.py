@@ -149,6 +149,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "geoint.source.firms.read",
             "geoint.source.aviation_weather.read",
             "geoint.source.copernicus.read",
+            "geoint.source.nexrad.read",
+            "geoint.source.goes.read",
         }
     ),
     "operator": frozenset(
@@ -162,6 +164,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "geoint.source.readsb.read",
             "geoint.source.ais.read",
             "geoint.source.horizons.read",
+            "geoint.source.nexrad.read",
+            "geoint.source.goes.read",
         }
     ),
     "admin": frozenset(
@@ -186,6 +190,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "geoint.source.ais.admin",
             "geoint.source.horizons.read",
             "geoint.source.horizons.admin",
+            "geoint.source.nexrad.read",
+            "geoint.source.nexrad.admin",
+            "geoint.source.goes.read",
+            "geoint.source.goes.admin",
             "geoint.admin.jobs",
             "geoint.admin.dlq",
             "geoint.admin.tenants",
