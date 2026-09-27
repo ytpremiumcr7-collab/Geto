@@ -79,12 +79,16 @@ class MinIODropzoneAdapter(SourceAdapter):
                 break
         return batch
 
+    def destination_key(self, key: str, *, failed: bool = False) -> str:
+        """Preserve the path relative to incoming/ to avoid tenant/path collisions."""
+        dest_prefix = self.prefix_failed if failed else self.prefix_processed
+        incoming = self.prefix_incoming.rstrip("/") + "/"
+        relative = key[len(incoming) :] if key.startswith(incoming) else key.lstrip("/")
+        return f"{dest_prefix.rstrip('/')}/{relative}"
+
     def mark_processed(self, key: str, *, failed: bool = False) -> None:
         """Mueve objeto a processed/ o failed/ (copy + remove)."""
-        dest_prefix = self.prefix_failed if failed else self.prefix_processed
-        # conservar nombre de archivo
-        filename = key.rsplit("/", 1)[-1]
-        dest = f"{dest_prefix.rstrip('/')}/{filename}"
+        dest = self.destination_key(key, failed=failed)
         from minio.commonconfig import CopySource
 
         self.client.copy_object(
