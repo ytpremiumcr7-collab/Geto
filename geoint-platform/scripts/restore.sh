@@ -50,6 +50,15 @@ docker compose -f "$COMPOSE_FILE" --profile ops run --rm \
 echo "[restore] upgrading restored schema to current code"
 compose run --rm --no-deps geoint-api alembic upgrade head
 
+echo "[restore] resetting ephemeral Redis/NATS transport state"
+compose up -d redis nats
+compose run --rm --no-deps -e RESTORE_CONFIRM=YES geoint-api python scripts/reset_transport.py
+
+echo "[restore] reconciling durable leases/executions after transport reset"
+compose exec -T postgres \
+  psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$DB" \
+  < "$ROOT/scripts/recover_after_restore.sql"
+
 echo "[restore] starting application services"
 compose up -d "${APP_SERVICES[@]}"
 
