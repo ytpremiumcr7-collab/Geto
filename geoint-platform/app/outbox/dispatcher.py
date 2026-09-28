@@ -73,10 +73,19 @@ class OutboxDispatcher:
                     )
                 else:
                     assert self.js.js is not None
+                    payload = message.payload or {}
+                    dedupe_key = str(message.id)
+                    if message.subject.startswith("geoint.jobs."):
+                        execution_id = payload.get("execution_id")
+                        if not execution_id:
+                            raise ValueError(
+                                f"job dispatch outbox {message.id} has no execution_id"
+                            )
+                        dedupe_key = str(execution_id)
                     await self.js.js.publish(
                         message.subject,
-                        json.dumps(message.payload, default=str).encode(),
-                        headers={"Nats-Msg-Id": str(message.id)},
+                        json.dumps(payload, default=str).encode(),
+                        headers={"Nats-Msg-Id": dedupe_key},
                     )
 
                 async with system_worker_session() as session:
