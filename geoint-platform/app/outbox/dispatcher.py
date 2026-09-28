@@ -109,9 +109,7 @@ class OutboxDispatcher:
                         base_backoff_seconds=settings.outbox_base_backoff_seconds,
                         commit=False,
                     )
-                    if outcome == "dead_lettered" and message.subject.startswith(
-                        f"{JOBS_PREFIX}."
-                    ):
+                    if outcome == "dead_lettered" and message.subject.startswith(f"{JOBS_PREFIX}."):
                         payload = message.payload or {}
                         job_id_raw = payload.get("job_id")
                         execution_id_raw = payload.get("execution_id")
