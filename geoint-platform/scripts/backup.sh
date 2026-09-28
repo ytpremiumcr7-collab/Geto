@@ -19,7 +19,14 @@ need POSTGRES_PASSWORD
 need S3_ACCESS_KEY
 need S3_SECRET_KEY
 mkdir -p "$DEST/s3"
-SNAPSHOT_USER="$(id -u):$(id -g)"
+if [[ "$(id -u)" == "0" ]]; then
+  SNAPSHOT_UID="${BACKUP_SNAPSHOT_UID:-10001}"
+  SNAPSHOT_GID="${BACKUP_SNAPSHOT_GID:-10001}"
+  chown -R "$SNAPSHOT_UID:$SNAPSHOT_GID" "$DEST/s3"
+  SNAPSHOT_USER="$SNAPSHOT_UID:$SNAPSHOT_GID"
+else
+  SNAPSHOT_USER="$(id -u):$(id -g)"
+fi
 
 RUNNING_APPS=()
 while IFS= read -r service; do
