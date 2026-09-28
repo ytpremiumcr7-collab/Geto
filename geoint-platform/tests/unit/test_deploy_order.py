@@ -11,9 +11,10 @@ def _cmd_up_body() -> str:
 def test_deploy_migrates_before_starting_application_services():
     body = _cmd_up_body()
 
+    quiesce = body.index("quiesce_apps")
     dependencies = body.index("compose up -d postgres redis nats minio")
     migrate = body.index("migrate")
     app_start = body.index("compose up -d geoint-api")
     ready = body.index("wait_ready")
 
-    assert dependencies < migrate < app_start < ready
+    assert quiesce < dependencies < migrate < app_start < ready
