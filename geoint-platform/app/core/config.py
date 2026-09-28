@@ -28,13 +28,13 @@ class Settings(BaseSettings):
     nats_stream: str = "GEOINT"
     nats_max_age_seconds: int = 604800
 
-    minio_endpoint: str = "localhost:9000"
-    minio_access_key: str
-    minio_secret_key: str
-    minio_bucket_raw: str = "geoint-raw"
+    s3_endpoint: str = "localhost:8333"
+    s3_access_key: str
+    s3_secret_key: str
+    s3_bucket_raw: str = "geoint-raw"
     dem_allowed_key_prefixes: str = "dem/,derived/"  # comma-separated
-    minio_secure: bool = False
-    minio_create_bucket: bool = True  # False in prod: provision externally
+    s3_secure: bool = False
+    s3_create_bucket: bool = True  # False in prod: provision externally
 
     opensky_client_id: str | None = None
     opensky_client_secret: str | None = None
@@ -129,7 +129,7 @@ class Settings(BaseSettings):
     observations_retention_days: int = 90
     raw_payload_retention_days: int = 30
 
-    minio_bucket_dropzone: str | None = None
+    s3_bucket_dropzone: str | None = None
     dropzone_prefix_incoming: str = "incoming/"
     dropzone_prefix_processed: str = "processed/"
     dropzone_prefix_failed: str = "failed/"

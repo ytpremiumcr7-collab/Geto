@@ -1,8 +1,8 @@
-"""Fuente sin API externa: lee GeoJSON/JSON desde un prefijo MinIO (drop zone).
+"""Fuente sin API externa: lee GeoJSON/JSON desde un prefijo S3 (drop zone).
 
 Flujo ops:
   1. Un proceso o partner sube archivos a s3://bucket/incoming/{tenant}/...
-  2. SourceJob `minio_dropzone` lista objetos nuevos, normaliza, mueve a processed/.
+  2. SourceJob `s3_dropzone` lista objetos nuevos, normaliza, mueve a processed/.
 """
 
 from __future__ import annotations
@@ -13,45 +13,37 @@ from collections.abc import AsyncIterator
 from datetime import UTC, datetime
 from typing import Any
 
-from minio import Minio
-
 from app.core.config import settings
 from app.domain.models import GeoPoint, Observation
+from app.infrastructure.s3_client import copy_object, create_s3_client, ensure_bucket
 from app.sources.base import SourceAdapter, SourceMetadata
 
 
-class MinIODropzoneAdapter(SourceAdapter):
+class S3DropzoneAdapter(SourceAdapter):
     metadata = SourceMetadata(
-        source_id="minio_dropzone",
+        source_id="s3_dropzone",
         source_type="file_drop",
-        description="GeoJSON/JSON drop zone on MinIO (no external API)",
-        endpoint="minio://geoint-raw/incoming/",
-        authentication="minio_credentials",
+        description="GeoJSON/JSON drop zone on S3 (no external API)",
+        endpoint="s3://geoint-raw/incoming/",
+        authentication="s3_credentials",
         license_name="operator-controlled",
         commercial_allowed=True,
         attribution_required=False,
     )
 
     def __init__(self) -> None:
-        self.client = Minio(
-            settings.minio_endpoint,
-            access_key=settings.minio_access_key,
-            secret_key=settings.minio_secret_key,
-            secure=settings.minio_secure,
-        )
-        self.bucket = getattr(settings, "minio_bucket_dropzone", None) or settings.minio_bucket_raw
+        self.client = create_s3_client()
+        self.bucket = getattr(settings, "s3_bucket_dropzone", None) or settings.s3_bucket_raw
         self.prefix_incoming = getattr(settings, "dropzone_prefix_incoming", "incoming/")
         self.prefix_processed = getattr(settings, "dropzone_prefix_processed", "processed/")
         self.prefix_failed = getattr(settings, "dropzone_prefix_failed", "failed/")
 
     def _ensure_bucket(self) -> None:
-        if self.client.bucket_exists(self.bucket):
-            return
-        if not getattr(settings, "minio_create_bucket", False):
-            raise RuntimeError(
-                f"MinIO bucket {self.bucket!r} does not exist and MINIO_CREATE_BUCKET is false"
-            )
-        self.client.make_bucket(self.bucket)
+        ensure_bucket(
+            self.client,
+            self.bucket,
+            allow_create=bool(getattr(settings, "s3_create_bucket", False)),
+        )
 
     async def health(self) -> bool:
         try:
@@ -98,12 +90,11 @@ class MinIODropzoneAdapter(SourceAdapter):
     def mark_processed(self, key: str, *, failed: bool = False) -> None:
         """Mueve objeto a processed/ o failed/ (copy + remove)."""
         dest = self.destination_key(key, failed=failed)
-        from minio.commonconfig import CopySource
-
-        self.client.copy_object(
-            self.bucket,
-            dest,
-            CopySource(self.bucket, key),
+        copy_object(
+            self.client,
+            bucket=self.bucket,
+            source_key=key,
+            destination_key=dest,
         )
         self.client.remove_object(self.bucket, key)
 
@@ -208,14 +199,14 @@ class MinIODropzoneAdapter(SourceAdapter):
         return Observation(
             entity_id=entity_id,
             entity_type=entity_type,
-            source_id="minio_dropzone",
+            source_id="s3_dropzone",
             source_record_id=f"{source_key}:{entity_id}",
             observed_at=observed_at,
             received_at=received_at,
             position=position,
             attributes={k: v for k, v in props.items() if k not in {"entity_id", "entity_type"}},
             provenance={
-                "source_id": "minio_dropzone",
+                "source_id": "s3_dropzone",
                 "object_key": source_key,
                 "adapter": self.__class__.__name__,
             },
@@ -238,12 +229,12 @@ class MinIODropzoneAdapter(SourceAdapter):
         return Observation(
             entity_id=entity_id,
             entity_type=str(row.get("entity_type") or "unknown"),
-            source_id="minio_dropzone",
+            source_id="s3_dropzone",
             source_record_id=str(row.get("id") or entity_id),
             observed_at=received_at,
             received_at=received_at,
             position=position,
             attributes=row,
-            provenance={"source_id": "minio_dropzone", "object_key": source_key},
+            provenance={"source_id": "s3_dropzone", "object_key": source_key},
             raw_payload=row,
         )

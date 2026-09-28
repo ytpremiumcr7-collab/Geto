@@ -6,7 +6,7 @@ from app.sources.copernicus.adapter import CopernicusSTACAdapter
 from app.sources.firms.adapter import NASAFIRMSAdapter
 from app.sources.goes.adapter import GOESAdapter
 from app.sources.horizons.adapter import JPLHorizonsAdapter
-from app.sources.minio_dropzone.adapter import MinIODropzoneAdapter
+from app.sources.s3_dropzone.adapter import S3DropzoneAdapter
 from app.sources.nexrad.adapter import NEXRADAdapter
 from app.sources.opensky.adapter import OpenSkyAdapter
 from app.sources.readsb.adapter import ReadsbLocalAdapter
@@ -26,5 +26,5 @@ def create_adapters() -> dict[str, SourceAdapter]:
         "nasa_firms": NASAFIRMSAdapter(),
         "aviation_weather": AviationWeatherAdapter(),
         "copernicus": CopernicusSTACAdapter(),
-        "minio_dropzone": MinIODropzoneAdapter(),
+        "s3_dropzone": S3DropzoneAdapter(),
     }
