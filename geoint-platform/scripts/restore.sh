@@ -49,8 +49,8 @@ env_value() {
 
 need POSTGRES_USER
 need POSTGRES_PASSWORD
-need MINIO_ROOT_USER
-need MINIO_ROOT_PASSWORD
+need S3_ACCESS_KEY
+need S3_SECRET_KEY
 need GEOINT_ENV_FILE
 
 [[ -f "$GEOINT_ENV_FILE" ]] || {
@@ -81,26 +81,19 @@ echo "[restore] stopping application services"
 compose stop "${APP_SERVICES[@]}" >/dev/null 2>&1 || true
 
 echo "[restore] starting authoritative storage"
-compose up -d --wait postgres minio
+compose up -d --wait postgres object-store
 
 echo "[restore] restoring PostgreSQL"
 cat "$DIR/postgres.dump" | compose exec -T postgres \
   pg_restore -U "$POSTGRES_USER" -d "$DB" \
     --clean --if-exists --no-owner --no-privileges
 
-echo "[restore] restoring MinIO buckets"
-docker compose -f "$COMPOSE_FILE" --profile ops run --rm \
-  -v "$DIR/minio:/backup:ro" \
-  minio-mc '
-    set -eu
-    mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-    for dir in /backup/*; do
-      [ -d "$dir" ] || continue
-      bucket="$(basename "$dir")"
-      mc mb --ignore-existing "local/$bucket" >/dev/null
-      mc mirror --overwrite --remove "$dir" "local/$bucket"
-    done
-  '
+echo "[restore] restoring S3 buckets"
+compose run --rm --no-deps \
+  -v "$DIR/s3:/backup:ro" \
+  geoint-api python scripts/s3_snapshot.py import \
+    --root /backup \
+    --replace
 
 echo "[restore] upgrading restored schema to current code"
 compose run --rm --no-deps geoint-api alembic upgrade head
