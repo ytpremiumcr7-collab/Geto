@@ -40,7 +40,7 @@ async def readiness():
         "postgres": False,
         "redis": False,
         "nats": False,
-        "minio": False,
+        "s3": False,
     }
     if settings.clickhouse_enabled:
         checks["clickhouse"] = False
@@ -120,21 +120,21 @@ async def readiness():
                 )
     timings_ms["nats"] = round((time.perf_counter() - t0) * 1000, 1)
 
-    # MinIO
+    # S3 object storage
     t0 = time.perf_counter()
     try:
         await asyncio.to_thread(ObjectStore().ensure_bucket)
-        checks["minio"] = True
+        checks["s3"] = True
     except Exception as e:
-        log.warning("health_minio_failed", error=str(e))
+        log.warning("health_s3_failed", error=str(e))
         errors.append(
             {
-                "component": "minio",
+                "component": "s3",
                 "error_type": type(e).__name__,
                 "message": str(e)[:500],
             }
         )
-    timings_ms["minio"] = round((time.perf_counter() - t0) * 1000, 1)
+    timings_ms["s3"] = round((time.perf_counter() - t0) * 1000, 1)
 
     if settings.clickhouse_enabled:
         t0 = time.perf_counter()
