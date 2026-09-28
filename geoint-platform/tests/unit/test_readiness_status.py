@@ -29,7 +29,7 @@ class _BoomBus:
 
 class _BoomStore:
     def ensure_bucket(self):
-        raise RuntimeError("minio down")
+        raise RuntimeError("s3 down")
 
 
 def test_readiness_returns_503_when_required_dependencies_are_down(monkeypatch):
@@ -44,4 +44,4 @@ def test_readiness_returns_503_when_required_dependencies_are_down(monkeypatch):
     assert body["status"] == "degraded"
     assert body["postgres"] is False
     assert body["nats"] is False
-    assert body["minio"] is False
+    assert body["s3"] is False
