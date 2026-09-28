@@ -72,3 +72,12 @@ def test_backup_snapshot_preserves_non_root_permissions():
     assert 'SNAPSHOT_USER="$(id -u):$(id -g)"' in backup
     assert '--user "$SNAPSHOT_USER"' in backup
     assert "chmod 777" not in backup
+
+
+def test_restore_reads_snapshot_as_its_owner_without_opening_permissions():
+    root = Path(__file__).resolve().parents[2]
+    restore = (root / "scripts" / "restore.sh").read_text()
+
+    assert 'stat -c "%u:%g" "$DIR/s3"' in restore
+    assert '--user "$SNAPSHOT_USER"' in restore
+    assert "chmod 777" not in restore
