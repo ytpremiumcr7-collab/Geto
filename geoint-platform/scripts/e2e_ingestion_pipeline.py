@@ -1,4 +1,4 @@
-"""Real ingestion E2E: scheduler -> JetStream -> worker -> dispatcher -> DB/MinIO."""
+"""Real ingestion E2E: scheduler -> DB outbox -> JetStream -> worker -> dispatcher -> DB/MinIO."""
 
 from __future__ import annotations
 
@@ -18,6 +18,7 @@ from app.db.session import engine
 from app.db.tenant import system_worker_session, tenant_session
 from app.infrastructure.object_store import ObjectStore
 from app.jobs.models import ProcessedMessage, SourceJob
+from app.outbox.dispatcher import OutboxDispatcher
 from app.outbox.models import OutboxMessage
 from app.workers.job_scheduler import JobScheduler
 from app.workers.source_worker import SourceWorker
@@ -143,16 +144,18 @@ async def main() -> int:
     fixture_path.write_text(json.dumps(fixture), encoding="utf-8")
 
     scheduler = JobScheduler(poll_interval=0.1)
+    outbox_dispatcher = OutboxDispatcher(batch_size=100, interval=0.1)
     worker = SourceWorker()
     worker_task: asyncio.Task[None] | None = None
     try:
-        # Scheduler connection creates/updates the JetStream streams.
-        await scheduler.js.connect()
+        # The scheduler has no broker dependency. The outbox owns JetStream.
+        await outbox_dispatcher.js.connect()
         worker_task = asyncio.create_task(worker.start())
         await _wait_worker_ready(worker)
 
         job_id = await _seed_job(str(fixture_path))
         await scheduler.tick()
+        await outbox_dispatcher.process_batch()
 
         job, observation, run, outbox = await _wait_pipeline(job_id, min_runs=1)
         first_success_at = job.last_success_at
@@ -203,6 +206,7 @@ async def main() -> int:
             await session.commit()
 
         await scheduler.tick()
+        await outbox_dispatcher.process_batch()
         job2, observation2, run2, _ = await _wait_pipeline(job_id, min_runs=2)
         assert job2.last_success_at is not None
         assert first_success_at is not None
@@ -246,7 +250,7 @@ async def main() -> int:
             except TimeoutError:
                 worker_task.cancel()
                 await asyncio.gather(worker_task, return_exceptions=True)
-        await scheduler.js.close()
+        await outbox_dispatcher.js.close()
         fixture_path.unlink(missing_ok=True)
         await engine.dispose()
 
