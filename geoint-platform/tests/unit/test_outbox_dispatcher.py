@@ -11,7 +11,11 @@ from app.outbox import dispatcher as dispatcher_mod
 
 
 class FakeSession:
-    pass
+    def __init__(self):
+        self.commits = 0
+
+    async def commit(self):
+        self.commits += 1
 
 
 @asynccontextmanager
