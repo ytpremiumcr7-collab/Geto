@@ -17,6 +17,7 @@ def _alert(source_id: str):
         rule_id=uuid4(),
         geofence_id=uuid4(),
         entity_id=f"entity:{source_id}",
+        source_id=source_id,
         event_type="enter",
         severity="medium",
         status="open",
@@ -44,22 +45,29 @@ class _Result:
     def scalars(self):
         return _Scalars(self.rows)
 
+    def scalar_one_or_none(self):
+        return self.rows[0] if len(self.rows) == 1 else None
+
 
 class _ListSession:
     def __init__(self, rows):
         self.rows = rows
+        self.statement = None
 
-    async def execute(self, _stmt):
+    async def execute(self, stmt):
+        self.statement = stmt
         return _Result(self.rows)
 
 
 class _GetSession:
-    def __init__(self, row):
-        self.row = row
+    def __init__(self, rows):
+        self.rows = rows
         self.committed = False
+        self.statement = None
 
-    async def get(self, _model, _pk):
-        return self.row
+    async def execute(self, stmt):
+        self.statement = stmt
+        return _Result(self.rows)
 
     async def commit(self):
         self.committed = True
@@ -71,10 +79,10 @@ class _GetSession:
 @pytest.mark.asyncio
 async def test_alert_list_never_exposes_restricted_source():
     svc = AlertService()
-    rows = [_alert("opensky"), _alert("usgs_earthquake")]
+    session = _ListSession([_alert("usgs_earthquake")])
 
     out = await svc.list_alerts(
-        _ListSession(rows),
+        session,
         "tenant-a",
         status="open",
         limit=50,
@@ -82,17 +90,20 @@ async def test_alert_list_never_exposes_restricted_source():
     )
 
     assert {item["source_id"] for item in out} == {"usgs_earthquake"}
+    assert session.statement is not None
+    assert "geofence_alerts.source_id" in str(session.statement)
 
 
 @pytest.mark.asyncio
 async def test_restricted_alert_cannot_be_acked_by_id():
     svc = AlertService()
-    session = _GetSession(_alert("opensky"))
+    restricted = _alert("opensky")
+    session = _GetSession([])
 
     out = await svc.ack_alert(
         session,
         "tenant-a",
-        session.row.id,
+        restricted.id,
         "operator-1",
         allowed_source_ids={"usgs_earthquake"},
     )
