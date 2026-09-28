@@ -43,24 +43,23 @@ services:
       timeout: 3s
       retries: 20
 
-  minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    command: server /data --console-address ":9001"
+  object-store:
+    image: chrislusf/seaweedfs:4.47
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
     environment:
-      MINIO_ROOT_USER: change-me
-      MINIO_ROOT_PASSWORD: change-me-minio-password
+      AWS_ACCESS_KEY_ID: change-me-s3
+      AWS_SECRET_ACCESS_KEY: change-me-s3-password
+      S3_BUCKET: geoint-raw
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "8333:8333"
     volumes:
-      - miniodata:/data
+      - s3data:/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8333"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
-
+      retries: 15
+      start_period: 15s
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     ports:
@@ -77,9 +76,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://geoint:change-me@postgres:5432/geoint
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: change-me
-      MINIO_SECRET_KEY: change-me-minio-password
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: change-me-s3
+      S3_SECRET_KEY: change-me-s3-password
     ports:
       - "8000:8000"
     depends_on:
@@ -89,7 +88,7 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-      minio:
+      object-store:
         condition: service_healthy
 
   geoint-scheduler:
@@ -100,9 +99,9 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://geoint:change-me@postgres:5432/geoint
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: change-me
-      MINIO_SECRET_KEY: change-me-minio-password
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: change-me-s3
+      S3_SECRET_KEY: change-me-s3-password
     depends_on:
       postgres:
         condition: service_healthy
@@ -118,15 +117,15 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://geoint:change-me@postgres:5432/geoint
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: change-me
-      MINIO_SECRET_KEY: change-me-minio-password
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: change-me-s3
+      S3_SECRET_KEY: change-me-s3-password
     depends_on:
       postgres:
         condition: service_healthy
       nats:
         condition: service_healthy
-      minio:
+      object-store:
         condition: service_healthy
     restart: unless-stopped
 
@@ -149,6 +148,6 @@ services:
 volumes:
   pgdata:
   natsdata:
-  miniodata:
+  s3data:
   clickhousedata:
 
