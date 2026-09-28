@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import asyncio
 import time
-from importlib.metadata import PackageNotFoundError, version as package_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 
 import redis.asyncio as redis_async
 import structlog
