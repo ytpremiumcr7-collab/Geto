@@ -95,6 +95,7 @@ class JobRepository:
         *,
         execution_id: UUID,
         terminal: bool = False,
+        commit: bool = True,
     ) -> bool:
         job = await session.get(SourceJob, job_id)
         if not job or job.execution_id != execution_id:
@@ -112,7 +113,10 @@ class JobRepository:
         job.locked_until = None
         job.locked_by = None
         job.last_error = (error or "")[:4000]
-        await session.commit()
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
         return True
 
     async def renew_execution_lease(
