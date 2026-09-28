@@ -16,6 +16,16 @@ from app.core.config import settings
 
 log = logging.getLogger(__name__)
 
+
+def clickhouse_http_auth() -> tuple[str, str] | None:
+    user = (getattr(settings, "clickhouse_user", None) or "").strip()
+    password = getattr(settings, "clickhouse_password", None) or ""
+    if not user and not password:
+        return None
+    if not user or not password:
+        raise RuntimeError("CLICKHOUSE_USER and CLICKHOUSE_PASSWORD must be configured together")
+    return (user, password)
+
 # Allowlisted query templates only (no arbitrary SQL from clients)
 QUERY_TEMPLATES: dict[str, str] = {
     "observations_by_source_24h": """
@@ -163,7 +173,7 @@ class ClickHouseSink:
             for row in normalized
         )
 
-        async with httpx.AsyncClient(timeout=30.0) as client:
+        async with httpx.AsyncClient(timeout=30.0, auth=clickhouse_http_auth()) as client:
             response = await client.post(
                 f"{self.url}/",
                 params={"query": query, "date_time_input_format": "best_effort"},
@@ -183,7 +193,7 @@ class ClickHouseClient:
         if not self.enabled:
             return False
         try:
-            async with httpx.AsyncClient(timeout=5.0) as client:
+            async with httpx.AsyncClient(timeout=5.0, auth=clickhouse_http_auth()) as client:
                 r = await client.get(f"{self.url}/ping")
                 return r.status_code == 200
         except Exception:
