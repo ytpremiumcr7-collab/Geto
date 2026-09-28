@@ -1,4 +1,4 @@
-"""MinIO ObjectStore — JSON + binary (COG/GeoTIFF) via to_thread."""
+"""S3 ObjectStore — JSON + binary (COG/GeoTIFF) via to_thread."""
 
 from __future__ import annotations
 
@@ -8,32 +8,21 @@ from datetime import UTC, datetime
 from io import BytesIO
 from uuid import uuid4
 
-from minio import Minio
-
 from app.core.config import settings
+from app.infrastructure.s3_client import create_s3_client, ensure_bucket
 
 
 class ObjectStore:
     def __init__(self):
-        self.client = Minio(
-            settings.minio_endpoint,
-            access_key=settings.minio_access_key,
-            secret_key=settings.minio_secret_key,
-            secure=settings.minio_secure,
-        )
+        self.client = create_s3_client()
 
     def ensure_bucket(self, bucket: str | None = None) -> str:
-        b = bucket or settings.minio_bucket_raw
-        exists = self.client.bucket_exists(b)
-        if not exists:
-            allow = getattr(settings, "minio_create_bucket", False)
-            if not allow:
-                raise RuntimeError(
-                    f"MinIO bucket {b!r} does not exist and MINIO_CREATE_BUCKET is false "
-                    "(provision buckets out-of-band in staging/production)"
-                )
-            self.client.make_bucket(b)
-        return b
+        target = bucket or settings.s3_bucket_raw
+        return ensure_bucket(
+            self.client,
+            target,
+            allow_create=bool(settings.s3_create_bucket),
+        )
 
     def _put_json_sync(self, key: str, payload) -> str:
         data = json.dumps(payload, ensure_ascii=False, default=str).encode("utf-8")
@@ -60,15 +49,15 @@ class ObjectStore:
         content_type: str = "application/octet-stream",
         bucket: str | None = None,
     ) -> str:
-        b = self.ensure_bucket(bucket)
+        target = self.ensure_bucket(bucket)
         self.client.put_object(
-            b,
+            target,
             key,
             BytesIO(data),
             length=len(data),
             content_type=content_type,
         )
-        return f"s3://{b}/{key}"
+        return f"s3://{target}/{key}"
 
     async def put_bytes(
         self,
@@ -80,8 +69,8 @@ class ObjectStore:
         return await asyncio.to_thread(self._put_bytes_sync, key, data, content_type, bucket)
 
     def _get_bytes_sync(self, key: str, bucket: str | None = None) -> bytes:
-        b = bucket or settings.minio_bucket_raw
-        response = self.client.get_object(b, key)
+        target = bucket or settings.s3_bucket_raw
+        response = self.client.get_object(target, key)
         try:
             return response.read()
         finally:

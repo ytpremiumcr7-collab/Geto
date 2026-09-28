@@ -28,13 +28,13 @@ class Settings(BaseSettings):
     nats_stream: str = "GEOINT"
     nats_max_age_seconds: int = 604800
 
-    minio_endpoint: str = "localhost:9000"
-    minio_access_key: str
-    minio_secret_key: str
-    minio_bucket_raw: str = "geoint-raw"
+    s3_endpoint: str = "localhost:8333"
+    s3_access_key: str
+    s3_secret_key: str
+    s3_bucket_raw: str = "geoint-raw"
     dem_allowed_key_prefixes: str = "dem/,derived/"  # comma-separated
-    minio_secure: bool = False
-    minio_create_bucket: bool = True  # False in prod: provision externally
+    s3_secure: bool = False
+    s3_create_bucket: bool = True  # False in prod: provision externally
 
     opensky_client_id: str | None = None
     opensky_client_secret: str | None = None
@@ -111,6 +111,13 @@ class Settings(BaseSettings):
     api_key_hashes: str | None = None
     jwt_jwks_url: str | None = None  # REQUIRED in production: OIDC JWKS URL
     jwt_tenant_claim: str = "tenant_id"
+    # Browser OIDC/BFF (Authorization Code + PKCE)
+    oidc_client_id: str | None = None
+    oidc_client_secret: str | None = None  # optional confidential-client mode
+    oidc_redirect_uri: str | None = None
+    oidc_discovery_url: str | None = None
+    oidc_scopes: str = "openid profile email"
+    oidc_state_ttl_seconds: int = 600
     # Emergency only: allow HS256 in production when OIDC is temporarily unavailable
     allow_hs256_in_production: bool = False
     rate_limit_per_minute: int = 120
@@ -122,7 +129,7 @@ class Settings(BaseSettings):
     observations_retention_days: int = 90
     raw_payload_retention_days: int = 30
 
-    minio_bucket_dropzone: str | None = None
+    s3_bucket_dropzone: str | None = None
     dropzone_prefix_incoming: str = "incoming/"
     dropzone_prefix_processed: str = "processed/"
     dropzone_prefix_failed: str = "failed/"
@@ -137,6 +144,8 @@ class Settings(BaseSettings):
 
     clickhouse_enabled: bool = False
     clickhouse_url: str = "http://localhost:8123"
+    clickhouse_user: str | None = None
+    clickhouse_password: str | None = None
 
     # Alert notifier (SMTP)
     smtp_host: str | None = None
@@ -148,6 +157,11 @@ class Settings(BaseSettings):
     alert_notifier_poll_seconds: float = 2.0
     alert_notifier_batch_size: int = 20
     alert_notifier_lease_seconds: int = 120
+
+    # Transactional outbox delivery policy
+    outbox_lease_seconds: int = 120
+    outbox_max_attempts: int = 8
+    outbox_base_backoff_seconds: int = 5
 
 
 @lru_cache

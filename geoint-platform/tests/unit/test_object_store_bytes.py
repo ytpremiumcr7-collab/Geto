@@ -1,4 +1,4 @@
-"""ObjectStore binary put/get with mock MinIO client (no real network)."""
+"""ObjectStore binary put/get with mock S3 client (no real network)."""
 
 from __future__ import annotations
 
@@ -27,13 +27,10 @@ def test_put_get_bytes_roundtrip():
     mock_client.put_object.side_effect = put_object
     mock_client.get_object.side_effect = get_object
 
-    with patch.object(osm, "Minio", return_value=mock_client):
+    with patch.object(osm, "create_s3_client", return_value=mock_client):
         with patch.object(osm, "settings") as settings:
-            settings.minio_endpoint = "localhost:9000"
-            settings.minio_access_key = "x"
-            settings.minio_secret_key = "y"
-            settings.minio_secure = False
-            settings.minio_bucket_raw = "geoint-raw"
+            settings.s3_bucket_raw = "geoint-raw"
+            settings.s3_create_bucket = False
 
             store = osm.ObjectStore()
             payload = b"COG-FAKE-BYTES-12345"

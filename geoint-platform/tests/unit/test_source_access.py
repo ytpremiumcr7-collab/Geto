@@ -52,3 +52,9 @@ def test_filter_hides_opensky_available_for_admin():
     assert by_id["opensky"]["available"] is False
     assert by_id["opensky"]["can_admin"] is True
     assert by_id["usgs_earthquake"]["available"] is True
+
+
+def test_operator_reads_nexrad_and_goes():
+    op = Principal("u", "t", frozenset({"operator"}))
+    assert can_read_source(op, "nexrad") is True
+    assert can_read_source(op, "goes") is True

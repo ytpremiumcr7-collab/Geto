@@ -51,6 +51,7 @@ def test_emit_skips_silenced_rule():
         "event_type": "geofence.enter",
         "geofence_id": str(fence_id),
         "entity_id": "acft-1",
+        "source_id": "usgs_earthquake",
         "occurred_at": datetime.now(UTC).isoformat(),
         "data": {},
     }
@@ -105,6 +106,7 @@ def test_emit_creates_on_enter():
         "event_type": "geofence.enter",
         "geofence_id": str(fence_id),
         "entity_id": "ship-9",
+        "source_id": "usgs_earthquake",
         "occurred_at": datetime.now(UTC).isoformat(),
         "data": {"lat": 1.0, "lon": 2.0},
     }

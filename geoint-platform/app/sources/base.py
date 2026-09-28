@@ -39,6 +39,15 @@ class SourceAdapter(ABC):
             names = ", ".join(sorted(kwargs))
             raise TypeError(f"unexpected fetch keyword argument(s): {names}")
 
+    async def after_commit(self, raw_data: Any) -> None:
+        """Acknowledge source-side input only after the ingestion DB commit.
+
+        Network APIs normally need no action. File/dropzone adapters can override
+        this to move or acknowledge inputs without creating a pre-commit data-loss
+        window.
+        """
+        return None
+
     @abstractmethod
     def normalize(
         self,

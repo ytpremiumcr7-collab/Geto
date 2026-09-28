@@ -21,6 +21,12 @@ class JobRepository:
         limit: int = 25,
         lease_seconds: int = 120,
     ) -> list[SourceJob]:
+        """Claim new schedules or recover an expired queued publication.
+
+        execution_id is created once per logical schedule execution and survives
+        scheduler publication retries/crash recovery. This lets NATS and the
+        consumer idempotency table deduplicate the same execution reliably.
+        """
         now = datetime.now(UTC)
         lease_until = now + timedelta(seconds=lease_seconds)
 
@@ -41,44 +47,65 @@ class JobRepository:
         jobs = list(result.scalars().all())
 
         for job in jobs:
+            if job.execution_id is None:
+                job.execution_id = uuid4()
             job.status = "queued"
             job.locked_until = lease_until
             job.locked_by = worker_id
             job.last_run_at = now
             job.attempts += 1
 
-        await session.commit()
+        # Caller owns the transaction so scheduling state and its dispatch
+        # outbox record can commit atomically.
         return jobs
 
-    async def mark_success(self, session: AsyncSession, job_id: UUID) -> None:
+    async def mark_success(
+        self,
+        session: AsyncSession,
+        job_id: UUID,
+        *,
+        execution_id: UUID,
+    ) -> bool:
+        """Complete only the execution currently owned by the job.
+
+        Late duplicate deliveries from an older execution must never clear the
+        lease or schedule state of a newer execution.
+        """
         job = await session.get(SourceJob, job_id)
-        if not job:
-            return
+        if not job or job.execution_id != execution_id:
+            return False
 
         now = datetime.now(UTC)
         job.status = "pending"
         job.next_run_at = now + timedelta(seconds=job.interval_seconds)
         job.locked_until = None
         job.locked_by = None
+        job.execution_id = None
         job.attempts = 0
         job.last_error = None
         job.last_success_at = now
         await session.commit()
+        return True
 
     async def mark_failure(
         self,
         session: AsyncSession,
         job_id: UUID,
         error: str,
-    ) -> None:
+        *,
+        execution_id: UUID,
+        terminal: bool = False,
+        commit: bool = True,
+    ) -> bool:
         job = await session.get(SourceJob, job_id)
-        if not job:
-            return
+        if not job or job.execution_id != execution_id:
+            return False
 
         now = datetime.now(UTC)
-        if job.attempts >= job.max_attempts:
+        if terminal or job.attempts >= job.max_attempts:
             job.status = "failed"
         else:
+            # Scheduler publication failure: retry the SAME execution identity.
             job.status = "retry"
             backoff = min(300, 2 ** max(job.attempts - 1, 0))
             job.next_run_at = now + timedelta(seconds=backoff)
@@ -86,7 +113,29 @@ class JobRepository:
         job.locked_until = None
         job.locked_by = None
         job.last_error = (error or "")[:4000]
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
+        return True
+
+    async def renew_execution_lease(
+        self,
+        session: AsyncSession,
+        job_id: UUID,
+        *,
+        execution_id: UUID,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> bool:
+        job = await session.get(SourceJob, job_id)
+        if not job or job.execution_id != execution_id:
+            return False
+        job.status = "running"
+        job.locked_until = datetime.now(UTC) + timedelta(seconds=max(30, lease_seconds))
+        job.locked_by = worker_id
         await session.commit()
+        return True
 
 
 class IdempotencyRepository:
@@ -174,6 +223,38 @@ class IdempotencyRepository:
 
         await session.commit()
         return outcome
+
+    async def renew_claim(
+        self,
+        session: AsyncSession,
+        *,
+        tenant_id: str,
+        message_id: str,
+        worker_id: str,
+        lease_seconds: int,
+    ) -> None:
+        now = datetime.now(UTC)
+        lease_until = now + timedelta(seconds=max(30, lease_seconds))
+        await session.execute(
+            text(
+                """
+                UPDATE processed_messages
+                SET lease_until = :lease_until, updated_at = :now
+                WHERE tenant_id = :tid
+                  AND message_id = :mid
+                  AND worker_id = :wid
+                  AND status = 'processing'
+                """
+            ),
+            {
+                "lease_until": lease_until,
+                "now": now,
+                "tid": tenant_id,
+                "mid": message_id,
+                "wid": worker_id,
+            },
+        )
+        await session.commit()
 
     async def mark_completed(
         self,

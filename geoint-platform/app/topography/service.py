@@ -1,4 +1,4 @@
-"""Topography service — orchestrates providers, catalog, engine, MinIO."""
+"""Topography service — orchestrates providers, catalog, engine, S3 object storage."""
 
 from __future__ import annotations
 
@@ -96,9 +96,9 @@ class TopographyService:
                     "auth": "none",
                     "status": "live",
                 },
-                "local_minio": {
+                "local_s3": {
                     "role": "analysis_COG",
-                    "auth": "minio credentials",
+                    "auth": "S3 credentials",
                     "status": "live",
                 },
                 "inegi": self.inegi.registration_help(),
@@ -275,7 +275,7 @@ class TopographyService:
             else:
                 raise ValueError(f"Unknown operation: {operation}")
 
-            # upload derived to MinIO
+            # upload derived to S3 object storage
             key = derived_object_key(tenant_id, operation, f"{dem_id}_{operation}.tif")
             uri = await self.store.put_bytes(
                 key,
@@ -546,7 +546,7 @@ class TopographyService:
             if len(parts) != 2:
                 raise ValueError("Invalid s3 uri")
             bucket, key = parts
-            if bucket != settings.minio_bucket_raw:
+            if bucket != settings.s3_bucket_raw:
                 raise ValueError("s3 bucket not allowed")
             if not key.startswith(allowed_prefixes):
                 raise ValueError(f"key must start with {allowed_prefixes}")
@@ -583,7 +583,7 @@ class TopographyService:
             allowed_prefixes = tuple(x.strip() for x in raw.split(",") if x.strip())
         else:
             allowed_prefixes = tuple(raw)
-        bucket_allowed = settings.minio_bucket_raw
+        bucket_allowed = settings.s3_bucket_raw
 
         if file_uri.startswith("s3://"):
             without = file_uri[5:]
