@@ -19,11 +19,25 @@ need MINIO_ROOT_USER
 need MINIO_ROOT_PASSWORD
 mkdir -p "$DEST/minio"
 
-restart=0
+RUNNING_APPS=()
+while IFS= read -r service; do
+  for app in "${APP_SERVICES[@]}"; do
+    if [[ "$service" == "$app" ]]; then
+      RUNNING_APPS+=("$service")
+      break
+    fi
+  done
+done < <(compose ps --services --filter status=running)
+
 restart_apps() {
-  if [[ "$restart" == "1" ]]; then
-    compose up -d "${APP_SERVICES[@]}" >/dev/null || true
+  local exit_code=$?
+  if (( ${#RUNNING_APPS[@]} > 0 )); then
+    if ! compose up -d "${RUNNING_APPS[@]}" >/dev/null; then
+      echo "[backup] failed to restart previously-running application services" >&2
+      [[ "$exit_code" -ne 0 ]] || exit_code=1
+    fi
   fi
+  return "$exit_code"
 }
 trap restart_apps EXIT
 
@@ -31,8 +45,7 @@ trap restart_apps EXIT
 # taking Postgres first and MinIO second cannot create DB references to objects
 # absent from the object backup.
 compose stop "${APP_SERVICES[@]}" >/dev/null 2>&1 || true
-restart=1
-compose up -d postgres minio
+compose up -d --wait postgres minio
 
 echo "[backup] PostgreSQL -> $DEST/postgres.dump"
 compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$DB" -Fc > "$DEST/postgres.dump"
