@@ -6,11 +6,14 @@ import asyncio
 import time
 from importlib.metadata import PackageNotFoundError, version as package_version
 
+import redis.asyncio as redis_async
 import structlog
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from sqlalchemy import text
 
+from app.analytics.clickhouse import ClickHouseClient
+from app.core.config import settings
 from app.db.session import engine
 from app.infrastructure.nats_bus import EventBus
 from app.infrastructure.object_store import ObjectStore
@@ -34,9 +37,12 @@ async def readiness():
     """
     checks: dict[str, bool] = {
         "postgres": False,
+        "redis": False,
         "nats": False,
         "minio": False,
     }
+    if settings.clickhouse_enabled:
+        checks["clickhouse"] = False
     errors: list[dict[str, str]] = []
     timings_ms: dict[str, float] = {}
 
@@ -56,6 +62,31 @@ async def readiness():
             }
         )
     timings_ms["postgres"] = round((time.perf_counter() - t0) * 1000, 1)
+
+    # Redis is required by production rate limiting and OIDC state.
+    t0 = time.perf_counter()
+    redis_client = None
+    try:
+        redis_client = redis_async.from_url(settings.redis_url, decode_responses=True)
+        if not await redis_client.ping():
+            raise RuntimeError("Redis PING returned a false value")
+        checks["redis"] = True
+    except Exception as e:
+        log.warning("health_redis_failed", error=str(e))
+        errors.append(
+            {
+                "component": "redis",
+                "error_type": type(e).__name__,
+                "message": str(e)[:500],
+            }
+        )
+    finally:
+        if redis_client is not None:
+            try:
+                await redis_client.aclose()
+            except Exception as e:
+                log.warning("health_redis_close_failed", error=str(e))
+    timings_ms["redis"] = round((time.perf_counter() - t0) * 1000, 1)
 
     # NATS
     t0 = time.perf_counter()
@@ -103,6 +134,23 @@ async def readiness():
             }
         )
     timings_ms["minio"] = round((time.perf_counter() - t0) * 1000, 1)
+
+    if settings.clickhouse_enabled:
+        t0 = time.perf_counter()
+        try:
+            if not await ClickHouseClient().ping():
+                raise RuntimeError("ClickHouse ping failed")
+            checks["clickhouse"] = True
+        except Exception as e:
+            log.warning("health_clickhouse_failed", error=str(e))
+            errors.append(
+                {
+                    "component": "clickhouse",
+                    "error_type": type(e).__name__,
+                    "message": str(e)[:500],
+                }
+            )
+        timings_ms["clickhouse"] = round((time.perf_counter() - t0) * 1000, 1)
 
     all_ok = all(checks.values())
     body = {
