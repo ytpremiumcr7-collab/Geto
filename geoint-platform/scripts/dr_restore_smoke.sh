@@ -86,7 +86,7 @@ INSERT INTO source_jobs (
   1,
   5,
   '{}'::jsonb,
-  true
+  false
 );
 COMMIT;
 SQL
