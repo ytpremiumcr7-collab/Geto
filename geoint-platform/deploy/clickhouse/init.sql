@@ -33,17 +33,6 @@ ALTER TABLE geoint.observations
     )))
     AFTER observed_at;
 
-CREATE TABLE IF NOT EXISTS geoint.alert_events
-(
-    tenant_id   String,
-    alert_id    UUID,
-    geofence_id UUID,
-    entity_id   String,
-    event_type  LowCardinality(String),
-    severity    LowCardinality(String),
-    occurred_at DateTime64(3, 'UTC')
-)
-ENGINE = MergeTree
-PARTITION BY toYYYYMM(occurred_at)
-ORDER BY (tenant_id, occurred_at, alert_id)
-TTL toDateTime(occurred_at) + INTERVAL 365 DAY;
+-- alert_events was never populated or queried by the product. Retire the unused
+-- projection rather than carrying a second, unrebuildable analytics table.
+DROP TABLE IF EXISTS geoint.alert_events;
