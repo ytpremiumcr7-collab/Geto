@@ -43,3 +43,27 @@ async def test_dropzone_geojson_feature_collection():
     assert result[0].position is not None
     assert result[0].position.lon == -99.13
     assert result[0].source_id == "minio_dropzone"
+
+
+def test_dropzone_does_not_autocreate_bucket_when_disabled(monkeypatch):
+    from app.sources.minio_dropzone import adapter as adapter_mod
+
+    class FakeClient:
+        def __init__(self):
+            self.created = []
+
+        def bucket_exists(self, _bucket):
+            return False
+
+        def make_bucket(self, bucket):
+            self.created.append(bucket)
+
+    adapter = object.__new__(MinIODropzoneAdapter)
+    adapter.bucket = "tenant-dropzone"
+    adapter.client = FakeClient()
+    monkeypatch.setattr(adapter_mod.settings, "minio_create_bucket", False)
+
+    with pytest.raises(RuntimeError, match="MINIO_CREATE_BUCKET"):
+        adapter._ensure_bucket()
+
+    assert adapter.client.created == []
