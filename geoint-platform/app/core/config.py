@@ -144,6 +144,8 @@ class Settings(BaseSettings):
 
     clickhouse_enabled: bool = False
     clickhouse_url: str = "http://localhost:8123"
+    clickhouse_user: str | None = None
+    clickhouse_password: str | None = None
 
     # Alert notifier (SMTP)
     smtp_host: str | None = None
