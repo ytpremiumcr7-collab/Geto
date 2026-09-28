@@ -62,3 +62,13 @@ def test_dr_workflow_executes_real_backup_restore_scripts():
     assert "scripts/dr_restore_smoke.sh" in workflow
     assert "pull_request:" in workflow
     assert "bash -n scripts/restore.sh" in workflow
+
+
+def test_backup_snapshot_preserves_non_root_permissions():
+    root = Path(__file__).resolve().parents[2]
+    backup = (root / "scripts" / "backup.sh").read_text()
+
+    assert "umask 077" in backup
+    assert 'SNAPSHOT_USER="$(id -u):$(id -g)"' in backup
+    assert '--user "$SNAPSHOT_USER"' in backup
+    assert "chmod 777" not in backup
