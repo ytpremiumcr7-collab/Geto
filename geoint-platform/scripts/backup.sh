@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 COMPOSE_FILE="${COMPOSE_FILE:-$ROOT/docker-compose.prod.yml}"
@@ -18,6 +19,7 @@ need POSTGRES_PASSWORD
 need S3_ACCESS_KEY
 need S3_SECRET_KEY
 mkdir -p "$DEST/s3"
+SNAPSHOT_USER="$(id -u):$(id -g)"
 
 RUNNING_APPS=()
 while IFS= read -r service; do
@@ -52,6 +54,7 @@ compose exec -T postgres pg_dump -U "$POSTGRES_USER" -d "$DB" -Fc > "$DEST/postg
 
 echo "[backup] S3 buckets ($BUCKETS) -> $DEST/s3"
 compose run --rm --no-deps \
+  --user "$SNAPSHOT_USER" \
   -v "$DEST/s3:/backup" \
   geoint-api python scripts/s3_snapshot.py export \
     --root /backup \
