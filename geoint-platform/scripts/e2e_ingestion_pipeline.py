@@ -1,4 +1,4 @@
-"""Real ingestion E2E: scheduler -> DB outbox -> JetStream -> worker -> dispatcher -> DB/MinIO."""
+"""Real ingestion E2E: scheduler -> DB outbox -> JetStream -> worker -> dispatcher -> DB/S3 object storage."""
 
 from __future__ import annotations
 
@@ -161,7 +161,7 @@ async def main() -> int:
         first_success_at = job.last_success_at
 
         assert observation.raw_payload_uri is not None
-        prefix = f"s3://{settings.minio_bucket_raw}/raw/{TENANT_ID}/readsb_local/"
+        prefix = f"s3://{settings.s3_bucket_raw}/raw/{TENANT_ID}/readsb_local/"
         assert observation.raw_payload_uri.startswith(prefix), observation.raw_payload_uri
 
         bucket_and_key = observation.raw_payload_uri.removeprefix("s3://")
