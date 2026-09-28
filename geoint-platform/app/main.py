@@ -27,6 +27,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.security_bootstrap import cors_origin_list, validate_settings
 from app.core.telemetry import setup_opentelemetry
+from app.middleware.cookie_csrf import CookieCsrfMiddleware
 from app.middleware.rate_limit_mw import RateLimitMiddleware
 
 configure_logging(settings.log_level)
@@ -74,6 +75,7 @@ if _trusted:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted)
 
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(CookieCsrfMiddleware)
 
 # CORS: explicit origins in prod (validated by security_bootstrap); * only in dev
 _origins = cors_origin_list(settings)
