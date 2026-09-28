@@ -41,6 +41,7 @@ def test_operational_shell_scripts_parse():
         root / "scripts" / "restore.sh",
         root / "scripts" / "verify_backup.sh",
         root / "scripts" / "deploy.sh",
+        root / "scripts" / "dr_restore_smoke.sh",
     ]
 
     for script in scripts:
@@ -50,3 +51,12 @@ def test_operational_shell_scripts_parse():
             capture_output=True,
             text=True,
         )
+
+
+def test_dr_workflow_executes_real_backup_restore_scripts():
+    root = Path(__file__).resolve().parents[3]
+    workflow = (root / ".github" / "workflows" / "dr-restore.yml").read_text()
+
+    assert "scripts/dr_restore_smoke.sh" in workflow
+    assert "pull_request:" in workflow
+    assert "bash -n scripts/restore.sh" in workflow
