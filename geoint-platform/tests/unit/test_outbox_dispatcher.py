@@ -36,7 +36,7 @@ class FakeRepo:
 
     async def persist_failure(self, _session, **kwargs):
         self.failures.append(kwargs)
-        return True
+        return getattr(self, "failure_outcome", "retry")
 
 
 class FakeJsContext:
@@ -48,6 +48,15 @@ class FakeJsContext:
         self.calls.append((subject, json.loads(payload.decode()), headers))
         if self.error:
             raise self.error
+
+
+class FakeJobsRepo:
+    def __init__(self):
+        self.failures = []
+
+    async def mark_failure(self, _session, job_id, error, **kwargs):
+        self.failures.append((job_id, error, kwargs))
+        return True
 
 
 class FakeJetStream:
@@ -118,3 +127,39 @@ async def test_job_dispatch_uses_execution_id_as_broker_dedupe_key(monkeypatch):
     await dispatcher.process_batch()
 
     assert dispatcher.js.js.calls[0][2] == {"Nats-Msg-Id": str(execution_id)}
+
+
+@pytest.mark.asyncio
+async def test_dead_lettered_job_dispatch_releases_schedule_atomically(monkeypatch):
+    monkeypatch.setattr(dispatcher_mod, "system_worker_session", fake_system_session)
+    job_id = uuid4()
+    execution_id = uuid4()
+    message = SimpleNamespace(
+        id=uuid4(),
+        tenant_id="tenant-a",
+        subject="geoint.jobs.usgs_earthquake",
+        payload={
+            "job_id": str(job_id),
+            "execution_id": str(execution_id),
+            "source_id": "usgs_earthquake",
+            "job_type": "poll",
+            "config": {},
+            "tenant_id": "tenant-a",
+        },
+    )
+    repo = FakeRepo([message])
+    repo.failure_outcome = "dead_lettered"
+    jobs = FakeJobsRepo()
+    dispatcher = dispatcher_mod.OutboxDispatcher()
+    dispatcher.repo = repo
+    dispatcher.jobs = jobs
+    dispatcher.js = FakeJetStream(RuntimeError("nats unavailable"))
+
+    await dispatcher.process_batch()
+
+    assert len(jobs.failures) == 1
+    failed_job_id, error, kwargs = jobs.failures[0]
+    assert failed_job_id == job_id
+    assert error == "nats unavailable"
+    assert kwargs["execution_id"] == execution_id
+    assert kwargs["commit"] is False
