@@ -77,6 +77,19 @@ esac
 
 bash "$ROOT/scripts/verify_backup.sh" "$DIR"
 
+SNAPSHOT_USER="$(stat -c "%u:%g" "$DIR/s3")"
+SNAPSHOT_UID="${SNAPSHOT_USER%%:*}"
+if [[ "$SNAPSHOT_UID" == "0" ]]; then
+  if [[ "$(id -u)" != "0" ]]; then
+    echo "S3 snapshot is root-owned; run restore as root once to normalize ownership" >&2
+    exit 1
+  fi
+  SNAPSHOT_UID="${RESTORE_SNAPSHOT_UID:-10001}"
+  SNAPSHOT_GID="${RESTORE_SNAPSHOT_GID:-10001}"
+  chown -R "$SNAPSHOT_UID:$SNAPSHOT_GID" "$DIR/s3"
+  SNAPSHOT_USER="$SNAPSHOT_UID:$SNAPSHOT_GID"
+fi
+
 echo "[restore] stopping application services"
 compose stop "${APP_SERVICES[@]}" >/dev/null 2>&1 || true
 
@@ -90,6 +103,7 @@ cat "$DIR/postgres.dump" | compose exec -T postgres \
 
 echo "[restore] restoring S3 buckets"
 compose run --rm --no-deps \
+  --user "$SNAPSHOT_USER" \
   -v "$DIR/s3:/backup:ro" \
   geoint-api python scripts/s3_snapshot.py import \
     --root /backup \
