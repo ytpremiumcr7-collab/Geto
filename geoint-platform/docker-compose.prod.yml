@@ -86,6 +86,7 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
       MINIO_SECURE: "false"
+      CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,6 +138,7 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       postgres:
         condition: service_healthy
@@ -250,16 +252,15 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     profiles: ["analytics"]
+    env_file: ${GEOINT_ENV_FILE}
     environment:
       CLICKHOUSE_DB: geoint
-      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-geoint}
-      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-geoint_ch}
       CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
     volumes:
       - chdata:/var/lib/clickhouse
       - ./deploy/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    ports:
-      - "${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+    expose:
+      - "8123"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
       interval: 10s
