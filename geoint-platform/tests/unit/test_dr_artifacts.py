@@ -6,6 +6,8 @@ def test_backup_restore_and_dr_verification_are_real_scripts():
     backup = (root / "scripts" / "backup.sh").read_text()
     restore = (root / "scripts" / "restore.sh").read_text()
     verify = (root / "scripts" / "verify_backup.sh").read_text()
+    recover = (root / "scripts" / "recover_after_restore.sql").read_text()
+    reset_transport = (root / "scripts" / "reset_transport.py").read_text()
 
     assert "pg_dump" in backup
     assert "mc mirror" in backup
@@ -14,3 +16,12 @@ def test_backup_restore_and_dr_verification_are_real_scripts():
     assert "mc mirror" in restore
     assert "RESTORE_CONFIRM" in restore
     assert "sha256sum -c" in verify
+
+    assert "reset_transport.py" in restore
+    assert "recover_after_restore.sql" in restore
+    assert "UPDATE source_jobs" in recover
+    assert "UPDATE processed_messages" in recover
+    assert "UPDATE outbox_messages" in recover
+    assert "UPDATE alert_deliveries" in recover
+    assert "flushdb" in reset_transport
+    assert "delete_stream" in reset_transport
