@@ -12,10 +12,10 @@ def test_backup_restore_and_dr_verification_are_real_scripts():
     rebuild_clickhouse = (root / "scripts" / "rebuild_clickhouse.py").read_text()
 
     assert "pg_dump" in backup
-    assert "mc mirror" in backup
+    assert "s3_snapshot.py" in backup
     assert "sha256sum" in backup
     assert "pg_restore" in restore
-    assert "mc mirror" in restore
+    assert "s3_snapshot.py" in restore
     assert "RESTORE_CONFIRM" in restore
     assert "sha256sum -c" in verify
 
