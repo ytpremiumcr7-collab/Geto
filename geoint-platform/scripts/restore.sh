@@ -33,10 +33,18 @@ compose() {
 
 env_value() {
   local key="$1"
-  grep -E "^[[:space:]]*${key}=" "$GEOINT_ENV_FILE" \
-    | tail -n1 \
-    | cut -d= -f2- \
-    | xargs
+  awk -v key="$key" '
+    {
+      line = $0
+      sub(/^[[:space:]]*/, "", line)
+      if (index(line, key "=") == 1) {
+        sub(/^[^=]*=/, "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        value = line
+      }
+    }
+    END { print value }
+  ' "$GEOINT_ENV_FILE"
 }
 
 need POSTGRES_USER
