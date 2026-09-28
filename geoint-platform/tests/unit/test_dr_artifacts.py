@@ -8,6 +8,7 @@ def test_backup_restore_and_dr_verification_are_real_scripts():
     verify = (root / "scripts" / "verify_backup.sh").read_text()
     recover = (root / "scripts" / "recover_after_restore.sql").read_text()
     reset_transport = (root / "scripts" / "reset_transport.py").read_text()
+    rebuild_clickhouse = (root / "scripts" / "rebuild_clickhouse.py").read_text()
 
     assert "pg_dump" in backup
     assert "mc mirror" in backup
@@ -25,3 +26,8 @@ def test_backup_restore_and_dr_verification_are_real_scripts():
     assert "UPDATE alert_deliveries" in recover
     assert "flushdb" in reset_transport
     assert "delete_stream" in reset_transport
+
+    assert "rebuild_clickhouse.py" in restore
+    assert "clickhouse_bootstrap.py" in restore
+    assert "TRUNCATE TABLE IF EXISTS geoint.observations" in rebuild_clickhouse
+    assert "system_worker_session" in rebuild_clickhouse
