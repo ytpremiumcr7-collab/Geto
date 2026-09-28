@@ -30,6 +30,10 @@ def _settings(**kwargs):
         auth_cookie_secure=True,
         oidc_client_id="geto-web",
         oidc_redirect_uri="https://app.example.com/api/v1/auth/oidc/callback",
+        clickhouse_enabled=False,
+        clickhouse_url="http://clickhouse:8123",
+        clickhouse_user=None,
+        clickhouse_password=None,
     )
     base.update(kwargs)
     return SimpleNamespace(**base)
@@ -190,6 +194,33 @@ def test_development_does_not_apply_production_plaintext_api_key_gate():
             api_keys="dev-key",
             jwt_jwks_url=None,
             jwt_algorithm="HS256",
+        ),
+        role="test",
+    )
+
+
+def test_production_rejects_clickhouse_without_credentials():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="CLICKHOUSE"):
+        validate_settings(
+            _settings(
+                clickhouse_enabled=True,
+                clickhouse_user="geoint",
+                clickhouse_password="",
+            ),
+            role="test",
+        )
+
+
+def test_production_accepts_authenticated_clickhouse():
+    from app.core.security_bootstrap import validate_settings
+
+    validate_settings(
+        _settings(
+            clickhouse_enabled=True,
+            clickhouse_user="geoint",
+            clickhouse_password="a-real-clickhouse-password",
         ),
         role="test",
     )
