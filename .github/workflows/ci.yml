@@ -80,9 +80,9 @@ jobs:
     env:
       DATABASE_URL: postgresql+asyncpg://geoint:geoint_ci_tests@localhost:5432/geoint
       REDIS_URL: redis://localhost:6379/0
-      MINIO_ENDPOINT: localhost:9000
-      MINIO_ACCESS_KEY: ciaccesskey12
-      MINIO_SECRET_KEY: cisecretkey123456
+      S3_ENDPOINT: localhost:8333
+      S3_ACCESS_KEY: ciaccesskey12
+      S3_SECRET_KEY: cisecretkey123456
       APP_ENV: test
       AUTH_DISABLED: "true"
       JWT_SECRET: "ci-tests-jwt-secret-at-least-32-bytes"
@@ -244,8 +244,8 @@ jobs:
           POSTGRES_USER=geoint \
           POSTGRES_PASSWORD=ci-postgres-password \
           POSTGRES_DB=geoint \
-          MINIO_ROOT_USER=ci-minio-user \
-          MINIO_ROOT_PASSWORD=ci-minio-password-not-default \
+          S3_ACCESS_KEY=ci-s3-user \
+          S3_SECRET_KEY=ci-s3-password-not-default \
           GEOINT_ENV_FILE=/tmp/geoint-ci.env \
           COMPOSE_PROFILES=analytics \
             docker compose -f geoint-platform/docker-compose.prod.yml config > /dev/null
@@ -299,9 +299,9 @@ jobs:
       DATABASE_URL: postgresql+asyncpg://geoint:geoint_ci_smoke@localhost:5432/geoint
       REDIS_URL: redis://localhost:6379/0
       NATS_URL: nats://localhost:4222
-      MINIO_ACCESS_KEY: ciaccesskey12
-      MINIO_SECRET_KEY: cisecretkey123456
-      MINIO_ENDPOINT: localhost:9000
+      S3_ACCESS_KEY: ciaccesskey12
+      S3_SECRET_KEY: cisecretkey123456
+      S3_ENDPOINT: localhost:8333
       APP_ENV: development
       AUTH_DISABLED: "true"
       JWT_SECRET: "ci-smoke-jwt-secret-32bytes-min!!"
