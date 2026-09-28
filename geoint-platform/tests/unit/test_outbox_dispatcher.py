@@ -92,3 +92,29 @@ async def test_outbox_dispatcher_persists_failure_for_bounded_retry(monkeypatch)
     assert dispatcher.repo.published == []
     assert dispatcher.repo.failures[0]["message_id"] == message.id
     assert dispatcher.repo.failures[0]["error"] == "nats unavailable"
+
+
+@pytest.mark.asyncio
+async def test_job_dispatch_uses_execution_id_as_broker_dedupe_key(monkeypatch):
+    monkeypatch.setattr(dispatcher_mod, "system_worker_session", fake_system_session)
+    execution_id = uuid4()
+    message = SimpleNamespace(
+        id=uuid4(),
+        tenant_id="tenant-a",
+        subject="geoint.jobs.usgs_earthquake",
+        payload={
+            "job_id": str(uuid4()),
+            "execution_id": str(execution_id),
+            "source_id": "usgs_earthquake",
+            "job_type": "poll",
+            "config": {},
+            "tenant_id": "tenant-a",
+        },
+    )
+    dispatcher = dispatcher_mod.OutboxDispatcher()
+    dispatcher.repo = FakeRepo([message])
+    dispatcher.js = FakeJetStream()
+
+    await dispatcher.process_batch()
+
+    assert dispatcher.js.js.calls[0][2] == {"Nats-Msg-Id": str(execution_id)}
