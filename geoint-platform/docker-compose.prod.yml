@@ -1,10 +1,10 @@
 # GEOINT production / staging stack
 # Secrets MUST be injected via environment or --env-file pointing to a secret-manager materialization.
-# Never commit .env.prod. Never use change-me / minioadmin defaults here.
+# Never commit .env.prod. Never use placeholder storage credentials here.
 #
 # Required host env (or env-file):
 #   POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
-#   MINIO_ROOT_USER, MINIO_ROOT_PASSWORD
+#   S3_ACCESS_KEY, S3_SECRET_KEY
 #   GEOINT_ENV_FILE  (path to API env with JWT_JWKS_URL, CORS_ORIGINS, DATABASE_URL, …)
 #
 # Bootstrap:
@@ -56,23 +56,25 @@ services:
     restart: unless-stopped
     networks: [geoint]
 
-  minio:
-    image: minio/minio:RELEASE.2025-04-22T22-12-26Z
-    command: server /data --console-address ":9001"
+  object-store:
+    image: chrislusf/seaweedfs:4.47
+    command: ["mini", "-dir=/data", "-ip.bind=0.0.0.0"]
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
+      AWS_ACCESS_KEY_ID: ${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}
+      AWS_SECRET_ACCESS_KEY: ${S3_SECRET_KEY:?S3_SECRET_KEY is required}
+      S3_BUCKET: ${S3_BUCKET_RAW:-geoint-raw}
     volumes:
-      - miniodata:/data
+      - s3data:/data
+    expose:
+      - "8333"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8333"]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 10s
+      retries: 15
+      start_period: 15s
     restart: unless-stopped
     networks: [geoint]
-
   geoint-api:
     build: .
     env_file: ${GEOINT_ENV_FILE:?GEOINT_ENV_FILE is required (e.g. /run/secrets/geoint.env)}
@@ -82,10 +84,10 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoint}
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
-      MINIO_SECURE: "false"
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_SECURE: "false"
       CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       postgres:
@@ -94,7 +96,7 @@ services:
         condition: service_healthy
       nats:
         condition: service_healthy
-      minio:
+      object-store:
         condition: service_healthy
     ports:
       - "${GEOINT_API_PORT:-8000}:8000"
@@ -135,9 +137,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoint}
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
       CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       postgres:
@@ -159,9 +161,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoint}
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
     depends_on:
       postgres:
         condition: service_healthy
@@ -181,9 +183,9 @@ services:
       AUTH_DISABLED: "false"
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoint}
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
       CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       postgres:
@@ -203,9 +205,9 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-geoint}
       REDIS_URL: redis://redis:6379/0
       NATS_URL: nats://nats:4222
-      MINIO_ENDPOINT: minio:9000
-      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
-      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      S3_ENDPOINT: object-store:8333
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
       GEOINT_SYSTEM_WORKER: "1"
       ALERT_NOTIFIER_HEALTH_PORT: "8081"
       ALERT_NOTIFIER_READY_MAX_AGE_S: "60"
@@ -236,18 +238,6 @@ services:
     restart: unless-stopped
     networks: [geoint]
 
-  minio-mc:
-    image: minio/mc:RELEASE.2025-04-16T18-13-26Z
-    profiles: ["ops"]
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}
-    depends_on:
-      minio:
-        condition: service_healthy
-    networks: [geoint]
-    entrypoint: ["/bin/sh", "-c"]
-
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     profiles: ["analytics"]
@@ -276,7 +266,7 @@ volumes:
   pgdata:
   redisdata:
   natsdata:
-  miniodata:
+  s3data:
   chdata:
 
 networks:
