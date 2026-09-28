@@ -10,46 +10,42 @@ from app.workers import job_scheduler as scheduler_mod
 
 
 class FakeSession:
-    pass
+    def __init__(self):
+        self.commits = 0
+
+    async def commit(self):
+        self.commits += 1
+
+
+session = FakeSession()
 
 
 @asynccontextmanager
 async def fake_system_session():
-    yield FakeSession()
-
-
-@asynccontextmanager
-async def fake_tenant_session(_tenant_id: str):
-    yield FakeSession()
+    yield session
 
 
 class FakeRepo:
     def __init__(self, jobs):
         self.jobs = jobs
-        self.failures = []
 
     async def claim_due_jobs(self, _session, **_kwargs):
         return self.jobs
 
-    async def mark_failure(self, _session, job_id, error, **kwargs):
-        self.failures.append((job_id, error, kwargs))
 
-
-class FakeJetStream:
-    def __init__(self, error: Exception | None = None):
+class FakeOutbox:
+    def __init__(self):
         self.calls = []
-        self.error = error
 
-    async def publish_job(self, **kwargs):
+    async def enqueue(self, _session, **kwargs):
         self.calls.append(kwargs)
-        if self.error:
-            raise self.error
+        return SimpleNamespace(id=uuid4())
 
 
 @pytest.mark.asyncio
-async def test_scheduler_publishes_persisted_execution_identity(monkeypatch):
+async def test_scheduler_enqueues_dispatch_in_same_database_transaction(monkeypatch):
+    session.commits = 0
     monkeypatch.setattr(scheduler_mod, "system_worker_session", fake_system_session)
-    monkeypatch.setattr(scheduler_mod, "tenant_session", fake_tenant_session)
     job_id = uuid4()
     execution_id = uuid4()
     job = SimpleNamespace(
@@ -57,49 +53,33 @@ async def test_scheduler_publishes_persisted_execution_identity(monkeypatch):
         execution_id=execution_id,
         source_id="usgs_earthquake",
         job_type="poll",
-        config={},
+        config={"x": 1},
         tenant_id="tenant-a",
     )
 
     scheduler = scheduler_mod.JobScheduler()
     scheduler.repo = FakeRepo([job])
-    scheduler.js = FakeJetStream()
+    scheduler.outbox = FakeOutbox()
 
     await scheduler.tick()
 
-    assert scheduler.js.calls == [
+    assert scheduler.outbox.calls == [
         {
-            "job_id": job_id,
-            "execution_id": execution_id,
-            "source_id": "usgs_earthquake",
-            "job_type": "poll",
-            "config": {},
+            "subject": "geoint.jobs.usgs_earthquake",
+            "payload": {
+                "job_id": str(job_id),
+                "execution_id": str(execution_id),
+                "source_id": "usgs_earthquake",
+                "job_type": "poll",
+                "config": {"x": 1},
+                "tenant_id": "tenant-a",
+            },
             "tenant_id": "tenant-a",
         }
     ]
+    assert session.commits == 1
 
 
-@pytest.mark.asyncio
-async def test_scheduler_publish_failure_retries_same_execution(monkeypatch):
-    monkeypatch.setattr(scheduler_mod, "system_worker_session", fake_system_session)
-    monkeypatch.setattr(scheduler_mod, "tenant_session", fake_tenant_session)
-    job_id = uuid4()
-    execution_id = uuid4()
-    job = SimpleNamespace(
-        id=job_id,
-        execution_id=execution_id,
-        source_id="usgs_earthquake",
-        job_type="poll",
-        config={},
-        tenant_id="tenant-a",
-    )
-
+def test_scheduler_has_no_direct_broker_dependency():
     scheduler = scheduler_mod.JobScheduler()
-    scheduler.repo = FakeRepo([job])
-    scheduler.js = FakeJetStream(RuntimeError("nats down"))
-
-    await scheduler.tick()
-
-    assert scheduler.repo.failures
-    _, _, kwargs = scheduler.repo.failures[0]
-    assert kwargs["execution_id"] == execution_id
+    assert not hasattr(scheduler, "js")
