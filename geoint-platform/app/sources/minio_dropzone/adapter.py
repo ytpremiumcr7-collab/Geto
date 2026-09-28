@@ -49,8 +49,7 @@ class MinIODropzoneAdapter(SourceAdapter):
             return
         if not getattr(settings, "minio_create_bucket", False):
             raise RuntimeError(
-                f"MinIO bucket {self.bucket!r} does not exist and "
-                "MINIO_CREATE_BUCKET is false"
+                f"MinIO bucket {self.bucket!r} does not exist and MINIO_CREATE_BUCKET is false"
             )
         self.client.make_bucket(self.bucket)
 
