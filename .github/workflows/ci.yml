@@ -151,14 +151,11 @@ jobs:
 
       - name: pip-audit
         working-directory: ./geoint-platform
-        run: |
-          pip-audit -r requirements.lock.txt --disable-pip || true
-        continue-on-error: true
+        run: pip-audit -r requirements.lock.txt --disable-pip
 
       - name: Bandit SAST
         working-directory: ./geoint-platform
         run: bandit -r app/ -ll -ii
-        continue-on-error: true
 
   # ==================== FRONTEND ====================
   frontend-build:
@@ -208,8 +205,7 @@ jobs:
 
       - name: npm audit
         working-directory: ./geoint-web
-        run: npm audit --audit-level=high || true  # advisory; does not block until lockfile policy
-        continue-on-error: true
+        run: npm audit --audit-level=moderate
 
   # ==================== DOCKER ====================
   docker-build:
