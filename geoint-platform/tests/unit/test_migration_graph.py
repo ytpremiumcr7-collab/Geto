@@ -15,7 +15,7 @@ def test_alembic_revision_graph_resolves_to_single_head():
     revisions = list(script.walk_revisions())
 
     assert revisions
-    assert script.get_current_head() == "0020"
+    assert script.get_current_head() == "0021"
     assert {revision.revision for revision in revisions} >= {
         "0011_alert_deliveries",
         "0012",
@@ -27,4 +27,5 @@ def test_alembic_revision_graph_resolves_to_single_head():
         "0018",
         "0019",
         "0020",
+        "0021",
     }

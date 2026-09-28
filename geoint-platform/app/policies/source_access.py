@@ -87,8 +87,8 @@ SOURCE_POLICIES: dict[str, SourceAccessPolicy] = {
         read_permission="geoint.source.copernicus.read",
         admin_permission="geoint.source.copernicus.admin",
     ),
-    "minio_dropzone": SourceAccessPolicy(
-        source_id="minio_dropzone",
+    "s3_dropzone": SourceAccessPolicy(
+        source_id="s3_dropzone",
         access_policy=AccessPolicy.INTERNAL,
         commercial_status="allowed",
         retention="standard",

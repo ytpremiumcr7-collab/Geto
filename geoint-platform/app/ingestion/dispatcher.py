@@ -74,13 +74,13 @@ def _fetch_kwargs(
             "stop": config.get("stop"),
             "step": config.get("step", "1 d"),
         }
-    if source_id == "minio_dropzone":
+    if source_id == "s3_dropzone":
         tenant_segment = quote(str(tenant_id).strip(), safe="-_.~")
         tenant_root = f"{settings.dropzone_prefix_incoming.rstrip('/')}/{tenant_segment}/"
         requested = str(config.get("prefix") or tenant_root)
         if not requested.startswith(tenant_root):
             raise ValueError(
-                f"minio_dropzone prefix must remain inside the tenant dropzone {tenant_root!r}"
+                f"s3_dropzone prefix must remain inside the tenant dropzone {tenant_root!r}"
             )
         return {
             "prefix": requested,
@@ -249,7 +249,7 @@ class SourceDispatcher:
                 tenant_id=tenant_id,
             )
         await session.commit()
-        # Source lifecycle acknowledgements (e.g. moving MinIO dropzone
+        # Source lifecycle acknowledgements (e.g. moving S3 dropzone
         # objects) happen only after the authoritative Postgres transaction is
         # durable. A failure here leaves the execution uncompleted so the worker
         # can retry the acknowledgement without losing source input.
