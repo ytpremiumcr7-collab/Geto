@@ -1,5 +1,5 @@
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 
 def test_backup_restore_and_dr_verification_are_real_scripts():
