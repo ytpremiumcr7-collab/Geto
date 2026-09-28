@@ -16,6 +16,14 @@ from app.core.config import settings
 from app.messaging.subjects import DLQ_PREFIX, JOBS_PREFIX
 
 
+def outbox_duplicate_window_seconds() -> float:
+    retries = max(0, int(settings.outbox_max_attempts) - 1)
+    base = max(1, int(settings.outbox_base_backoff_seconds))
+    retry_horizon = sum(min(3600, base * (2**attempt)) for attempt in range(retries))
+    lease = max(30, int(settings.outbox_lease_seconds))
+    return float(max(300, retry_horizon + (2 * lease)))
+
+
 class JetStreamClient:
     def __init__(self, url: str | None = None):
         self.url = url or settings.nats_url
@@ -43,6 +51,7 @@ class JetStreamClient:
                 retention=RetentionPolicy.LIMITS,
                 storage=StorageType.FILE,
                 max_age=settings.nats_max_age_seconds,
+                duplicate_window=outbox_duplicate_window_seconds(),
             ),
             StreamConfig(
                 name=f"{settings.nats_stream}_DLQ",
