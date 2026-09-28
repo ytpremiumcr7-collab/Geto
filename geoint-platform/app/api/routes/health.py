@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import time
+from importlib.metadata import PackageNotFoundError, version as package_version
 
 import structlog
 from fastapi import APIRouter
@@ -89,7 +91,7 @@ async def readiness():
     # MinIO
     t0 = time.perf_counter()
     try:
-        ObjectStore().ensure_bucket()
+        await asyncio.to_thread(ObjectStore().ensure_bucket)
         checks["minio"] = True
     except Exception as e:
         log.warning("health_minio_failed", error=str(e))
@@ -116,13 +118,16 @@ async def readiness():
 
 @router.get("/health/version")
 async def version():
-    from pathlib import Path
+    try:
+        ver = package_version("geoint-platform")
+    except PackageNotFoundError:
+        # Source-tree fallback for running without installing the package.
+        from pathlib import Path
 
-    root = Path(__file__).resolve().parents[3]
-    ver = "0.0.0"
-    vf = root.parent / "VERSION"
-    if not vf.exists():
-        vf = root / "VERSION"
-    if vf.exists():
-        ver = vf.read_text().strip() or ver
+        root = Path(__file__).resolve().parents[3]
+        candidates = (root / "VERSION", root.parent / "VERSION")
+        ver = next(
+            (path.read_text().strip() for path in candidates if path.exists()),
+            "unknown",
+        )
     return {"version": ver, "product": "geoint-platform"}
