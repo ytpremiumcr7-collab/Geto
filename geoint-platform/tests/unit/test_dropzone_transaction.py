@@ -3,15 +3,15 @@ from __future__ import annotations
 import asyncio
 from datetime import UTC, datetime
 
-from app.sources.minio_dropzone.adapter import MinIODropzoneAdapter
+from app.sources.s3_dropzone.adapter import S3DropzoneAdapter
 
 
 async def _collect(adapter, raw):
     return [item async for item in adapter.normalize(raw, datetime.now(UTC))]
 
 
-def _adapter_without_minio():
-    adapter = object.__new__(MinIODropzoneAdapter)
+def _adapter_without_s3_backend():
+    adapter = object.__new__(S3DropzoneAdapter)
     adapter.bucket = "drop"
     adapter.prefix_processed = "processed/"
     adapter.prefix_failed = "failed/"
@@ -25,7 +25,7 @@ def _adapter_without_minio():
 
 
 def test_normalize_does_not_ack_input_before_database_commit():
-    adapter = _adapter_without_minio()
+    adapter = _adapter_without_s3_backend()
     raw = [
         {
             "key": "incoming/a.json",
@@ -40,7 +40,7 @@ def test_normalize_does_not_ack_input_before_database_commit():
 
 
 def test_after_commit_acknowledges_dropzone_inputs():
-    adapter = _adapter_without_minio()
+    adapter = _adapter_without_s3_backend()
     raw = [
         {
             "key": "incoming/a.json",
