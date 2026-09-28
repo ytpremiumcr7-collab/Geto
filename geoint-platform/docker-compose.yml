@@ -55,7 +55,7 @@ services:
     volumes:
       - s3data:/data
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8333"]
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9333/cluster/status"]
       interval: 10s
       timeout: 5s
       retries: 15
