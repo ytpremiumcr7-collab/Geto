@@ -44,22 +44,24 @@ async def lifespan(app: FastAPI):
     bridge = None
     task = None
     if settings.app_env not in ("test",):
-        try:
-            from app.realtime.nats_bridge import RealtimeNatsBridge
+        from app.realtime.nats_bridge import RealtimeNatsBridge
 
-            bridge = RealtimeNatsBridge()
-            task = asyncio.create_task(bridge.start())
-        except Exception:
-            bridge = None
-    yield
-    if bridge:
-        bridge.stop()
-        if task:
-            task.cancel()
-            try:
-                await task
-            except Exception:
-                pass
+        bridge = RealtimeNatsBridge()
+        # NATS/realtime is a required product dependency. Do not report a
+        # successful API startup while its subscriptions are dead in a task.
+        await bridge.connect()
+        task = asyncio.create_task(bridge.serve())
+    try:
+        yield
+    finally:
+        if bridge:
+            bridge.stop()
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             await bridge.close()
 
 
