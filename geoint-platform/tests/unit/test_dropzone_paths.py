@@ -1,11 +1,11 @@
 import pytest
 
 from app.ingestion.dispatcher import _fetch_kwargs
-from app.sources.minio_dropzone.adapter import MinIODropzoneAdapter
+from app.sources.s3_dropzone.adapter import S3DropzoneAdapter
 
 
 def test_processed_destination_preserves_relative_path():
-    adapter = object.__new__(MinIODropzoneAdapter)
+    adapter = object.__new__(S3DropzoneAdapter)
     adapter.prefix_incoming = "incoming/"
     adapter.prefix_processed = "processed/"
     adapter.prefix_failed = "failed/"
@@ -21,12 +21,12 @@ def test_processed_destination_preserves_relative_path():
 
 
 def test_dropzone_fetch_prefix_is_tenant_scoped():
-    kwargs = _fetch_kwargs("minio_dropzone", {}, tenant_id="tenant-a")
+    kwargs = _fetch_kwargs("s3_dropzone", {}, tenant_id="tenant-a")
     assert kwargs["prefix"] == "incoming/tenant-a/"
 
     with pytest.raises(ValueError, match="tenant dropzone"):
         _fetch_kwargs(
-            "minio_dropzone",
+            "s3_dropzone",
             {"prefix": "incoming/tenant-b/private/"},
             tenant_id="tenant-a",
         )
