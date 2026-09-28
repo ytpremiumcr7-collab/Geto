@@ -18,6 +18,7 @@ APP_ENV="${APP_ENV:-production}"
 SEED_SQL="${SEED_SQL:-$ROOT/seed_source_jobs.sql}"
 HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:${GEOINT_API_PORT:-8000}/health/ready}"
 MAX_WAIT_READY="${MAX_WAIT_READY:-120}"
+APP_SERVICES=(geoint-api geoint-web geoint-scheduler geoint-worker geoint-outbox geoint-alert-notifier)
 
 log() { printf '[deploy] %s\n' "$*"; }
 die() { printf '[deploy] ERROR: %s\n' "$*" >&2; exit 1; }
@@ -89,6 +90,11 @@ wait_ready() {
   echo
 }
 
+quiesce_apps() {
+  log "Stopping existing application writers before schema migration"
+  compose stop "${APP_SERVICES[@]}" >/dev/null 2>&1 || true
+}
+
 migrate() {
   log "Running alembic upgrade head before application services start"
   compose run --rm --no-deps geoint-api alembic upgrade head
@@ -113,6 +119,11 @@ cmd_up() {
   log "Building stack (APP_ENV=$APP_ENV)"
   compose pull || true
   compose build
+
+  # A redeploy may still have previous API/workers running. Quiesce them before
+  # any schema transition; otherwise old code can write while Alembic changes
+  # invariants underneath it.
+  quiesce_apps
 
   # Bring up only stateful dependencies first. New application code must never
   # execute against the previous schema.
