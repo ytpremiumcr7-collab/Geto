@@ -19,17 +19,18 @@ BATCH_SIZE = 1000
 async def _truncate() -> None:
     auth = clickhouse_http_auth()
     async with httpx.AsyncClient(timeout=30.0, auth=auth) as client:
-        for table in ("geoint.observations", "geoint.alert_events"):
-            response = await client.post(
-                f"{settings.clickhouse_url.rstrip('/')}/",
-                content=f"TRUNCATE TABLE IF EXISTS {table}".encode(),
-            )
-            response.raise_for_status()
+        response = await client.post(
+            f"{settings.clickhouse_url.rstrip('/')}/",
+            content=b"TRUNCATE TABLE IF EXISTS geoint.observations",
+        )
+        response.raise_for_status()
 
 
 async def _tenants() -> list[str]:
     async with system_worker_session() as session:
-        result = await session.execute(text("SELECT DISTINCT tenant_id FROM observations ORDER BY tenant_id"))
+        result = await session.execute(
+            text("SELECT DISTINCT tenant_id FROM observations ORDER BY tenant_id")
+        )
         return [str(row[0]) for row in result.all()]
 
 
@@ -41,7 +42,8 @@ async def _rebuild_tenant(tenant_id: str) -> int:
     total = 0
     after: UUID | None = None
     while True:
-        query = """
+        after_clause = "AND id > CAST(:after_id AS uuid)" if after is not None else ""
+        query = f"""
             SELECT
                 id,
                 source_id,
@@ -58,19 +60,15 @@ async def _rebuild_tenant(tenant_id: str) -> int:
             FROM observations
             WHERE tenant_id = :tenant_id
               AND geometry IS NOT NULL
-              AND (:after_id IS NULL OR id > :after_id)
+              {after_clause}
             ORDER BY id
             LIMIT :batch_size
         """
+        params = {"tenant_id": tenant_id, "batch_size": BATCH_SIZE}
+        if after is not None:
+            params["after_id"] = str(after)
         async with system_worker_session() as session:
-            result = await session.execute(
-                text(query),
-                {
-                    "tenant_id": tenant_id,
-                    "after_id": after,
-                    "batch_size": BATCH_SIZE,
-                },
-            )
+            result = await session.execute(text(query), params)
             rows = list(result.mappings().all())
 
         if not rows:
