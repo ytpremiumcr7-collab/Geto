@@ -51,9 +51,7 @@ def test_cross_site_fetch_metadata_is_rejected_before_origin_fallback(monkeypatc
 def test_same_origin_fetch_metadata_allows_cookie_mutation(monkeypatch):
     _prod(monkeypatch)
 
-    assert browser_cookie_mutation_allowed(
-        _request(sec_fetch_site="same-origin")
-    )
+    assert browser_cookie_mutation_allowed(_request(sec_fetch_site="same-origin"))
 
 
 def test_allowed_origin_is_fallback_for_same_site_cross_origin_bff(monkeypatch):
