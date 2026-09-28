@@ -119,24 +119,24 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
             if env == "production" and not jwks.startswith("https://"):
                 errors.append("JWT_JWKS_URL must use https:// in production")
 
-        # Secrets: database, minio
+        # Secrets: database and S3 object storage
         if _looks_like_placeholder_dsn(settings.database_url or ""):
             errors.append(
                 "DATABASE_URL contains a placeholder password (change-me/geoint/password). "
                 "Inject secrets from your secret manager."
             )
 
-        minio_ak = getattr(settings, "minio_access_key", "") or ""
-        minio_sk = getattr(settings, "minio_secret_key", "") or ""
-        if _is_forbidden(minio_ak) or _is_forbidden(minio_sk):
+        s3_ak = getattr(settings, "s3_access_key", "") or ""
+        s3_sk = getattr(settings, "s3_secret_key", "") or ""
+        if _is_forbidden(s3_ak) or _is_forbidden(s3_sk):
             errors.append(
-                "MINIO_ACCESS_KEY / MINIO_SECRET_KEY are missing or use forbidden defaults. "
+                "S3_ACCESS_KEY / S3_SECRET_KEY are missing or use forbidden defaults. "
                 "Inject from secret manager."
             )
 
-        if getattr(settings, "minio_create_bucket", True):
+        if getattr(settings, "s3_create_bucket", True):
             errors.append(
-                "MINIO_CREATE_BUCKET must be false in production/staging; "
+                "S3_CREATE_BUCKET must be false in production/staging; "
                 "provision object-storage buckets out-of-band before deploy"
             )
 
