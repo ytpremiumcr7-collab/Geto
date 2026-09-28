@@ -64,6 +64,15 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 20
+      redis:
+        image: redis:7.4-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
     env:
       DATABASE_URL: postgresql+asyncpg://geoint:geoint_ci_tests@localhost:5432/geoint
       REDIS_URL: redis://localhost:6379/0
@@ -417,7 +426,12 @@ jobs:
           echo "| Docker Build | ${{ needs.docker-build.result }} |" >> $GITHUB_STEP_SUMMARY
 
           if [ "${{ needs.backend-lint.result }}" != "success" ] || \
-             [ "${{ needs.frontend-build.result }}" != "success" ]; then
-            echo "Critical jobs failed"
+             [ "${{ needs.backend-test.result }}" != "success" ] || \
+             [ "${{ needs.backend-security.result }}" != "success" ] || \
+             [ "${{ needs.frontend-build.result }}" != "success" ] || \
+             [ "${{ needs.frontend-security.result }}" != "success" ] || \
+             [ "${{ needs.docker-build.result }}" != "success" ] || \
+             [ "${{ needs.e2e-smoke.result }}" != "success" ]; then
+            echo "One or more required CI jobs failed or were skipped"
             exit 1
           fi
