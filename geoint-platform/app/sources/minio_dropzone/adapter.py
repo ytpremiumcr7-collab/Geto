@@ -7,6 +7,7 @@ Flujo ops:
 
 from __future__ import annotations
 
+import asyncio
 import json
 from collections.abc import AsyncIterator
 from datetime import UTC, datetime
@@ -44,19 +45,23 @@ class MinIODropzoneAdapter(SourceAdapter):
         self.prefix_failed = getattr(settings, "dropzone_prefix_failed", "failed/")
 
     def _ensure_bucket(self) -> None:
-        if not self.client.bucket_exists(self.bucket):
-            self.client.make_bucket(self.bucket)
+        if self.client.bucket_exists(self.bucket):
+            return
+        if not getattr(settings, "minio_create_bucket", False):
+            raise RuntimeError(
+                f"MinIO bucket {self.bucket!r} does not exist and "
+                "MINIO_CREATE_BUCKET is false"
+            )
+        self.client.make_bucket(self.bucket)
 
     async def health(self) -> bool:
         try:
-            self._ensure_bucket()
+            await asyncio.to_thread(self._ensure_bucket)
             return True
         except Exception:
             return False
 
-    async def fetch(self, prefix: str | None = None, max_objects: int = 50, **kwargs: Any) -> Any:
-        """Lista y descarga hasta max_objects del prefijo incoming."""
-        self._reject_unexpected_fetch_kwargs(kwargs)
+    def _fetch_sync(self, prefix: str | None, max_objects: int) -> list[dict[str, Any]]:
         self._ensure_bucket()
         base = prefix or self.prefix_incoming
         objects = self.client.list_objects(self.bucket, prefix=base, recursive=True)
@@ -78,6 +83,11 @@ class MinIODropzoneAdapter(SourceAdapter):
             if len(batch) >= max_objects:
                 break
         return batch
+
+    async def fetch(self, prefix: str | None = None, max_objects: int = 50, **kwargs: Any) -> Any:
+        """Lista y descarga hasta max_objects del prefijo incoming sin bloquear el event loop."""
+        self._reject_unexpected_fetch_kwargs(kwargs)
+        return await asyncio.to_thread(self._fetch_sync, prefix, max_objects)
 
     def destination_key(self, key: str, *, failed: bool = False) -> str:
         """Preserve the path relative to incoming/ to avoid tenant/path collisions."""
@@ -119,7 +129,7 @@ class MinIODropzoneAdapter(SourceAdapter):
         for item in raw_data:
             key = item.get("key") if isinstance(item, dict) else None
             if key:
-                self.mark_processed(str(key), failed=False)
+                await asyncio.to_thread(self.mark_processed, str(key), failed=False)
 
     async def _normalize_payload(
         self,
