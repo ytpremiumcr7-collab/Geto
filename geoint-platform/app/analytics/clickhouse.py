@@ -26,6 +26,7 @@ def clickhouse_http_auth() -> tuple[str, str] | None:
         raise RuntimeError("CLICKHOUSE_USER and CLICKHOUSE_PASSWORD must be configured together")
     return (user, password)
 
+
 # Allowlisted query templates only (no arbitrary SQL from clients)
 QUERY_TEMPLATES: dict[str, str] = {
     "observations_by_source_24h": """
