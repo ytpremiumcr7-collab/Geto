@@ -48,27 +48,7 @@ class SourceWorker:
         self.js = js
         await self.dlq.connect()
 
-        # Asegurar stream de jobs (idempotente)
-        try:
-            await js.stream_info(settings.nats_stream)
-        except Exception:
-            from nats.js.api import RetentionPolicy, StorageType, StreamConfig
-
-            await js.add_stream(
-                StreamConfig(
-                    name=settings.nats_stream,
-                    subjects=[
-                        f"{JOBS_PREFIX}.>",
-                        "geoint.observation.>",
-                        "geoint.event.>",
-                        "geoint.alert.>",
-                        "geoint.ingestion.>",
-                    ],
-                    retention=RetentionPolicy.LIMITS,
-                    storage=StorageType.FILE,
-                    max_age=settings.nats_max_age_seconds,
-                )
-            )
+        # JetStreamClient.connect() above is the single topology authority.
 
         # Consumer durable + queue + límites de entrega
         config = ConsumerConfig(
