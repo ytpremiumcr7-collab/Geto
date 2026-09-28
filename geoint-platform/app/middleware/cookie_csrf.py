@@ -1,11 +1,13 @@
-"""Origin-based CSRF guard for HttpOnly browser sessions.
+"""CSRF guard for HttpOnly browser sessions.
 
-Bearer tokens and API keys are explicit request credentials and are not subject to
-this browser-cookie guard. Cookie-authenticated unsafe HTTP methods are accepted
-only from an explicitly allowed production/staging Origin.
+Unsafe cookie-authenticated requests use Fetch Metadata when present and fall
+back to exact Origin/Referer verification. Bearer tokens and API keys are
+explicit credentials and do not rely on ambient browser cookies.
 """
 
 from __future__ import annotations
+
+from urllib.parse import urlsplit
 
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
@@ -18,14 +20,23 @@ _UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _PROD_ENVS = frozenset({"production", "prod", "staging"})
 
 
+def _origin_from_referer(value: str) -> str | None:
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return None
+    if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+        return None
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
 def browser_cookie_mutation_allowed(request: Request) -> bool:
     if request.method.upper() not in _UNSAFE_METHODS:
         return True
     if not settings.auth_cookie_mode:
         return True
 
-    # If an explicit credential is supplied, get_current_principal will prefer it
-    # over the cookie. This guard is specifically for ambient browser credentials.
+    # Explicit request credentials are handled independently by authentication.
     auth = (request.headers.get("authorization") or "").strip()
     if auth.lower().startswith("bearer "):
         return True
@@ -40,10 +51,24 @@ def browser_cookie_mutation_allowed(request: Request) -> bool:
     if env not in _PROD_ENVS:
         return True
 
-    origin = (request.headers.get("origin") or "").strip()
-    if not origin:
+    fetch_site = (request.headers.get("sec-fetch-site") or "").strip().lower()
+    if fetch_site == "cross-site":
         return False
-    return origin in cors_origin_list(settings)
+    if fetch_site == "same-origin":
+        return True
+
+    allowed_origins = set(cors_origin_list(settings))
+    origin = (request.headers.get("origin") or "").strip()
+    if origin:
+        return origin in allowed_origins
+
+    referer = (request.headers.get("referer") or "").strip()
+    referer_origin = _origin_from_referer(referer) if referer else None
+    if referer_origin:
+        return referer_origin in allowed_origins
+
+    # Production cookie writes fail closed when browser provenance is absent.
+    return False
 
 
 class CookieCsrfMiddleware(BaseHTTPMiddleware):
@@ -53,7 +78,10 @@ class CookieCsrfMiddleware(BaseHTTPMiddleware):
                 {
                     "detail": {
                         "error": "csrf_origin_denied",
-                        "message": "Cookie-authenticated state changes require an allowed Origin.",
+                        "message": (
+                            "Cookie-authenticated state changes require trusted "
+                            "browser request provenance."
+                        ),
                     }
                 },
                 status_code=403,
