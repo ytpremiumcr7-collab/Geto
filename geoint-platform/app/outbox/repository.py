@@ -80,14 +80,18 @@ class OutboxRepository:
             or message.published_at is not None
             or message.dead_lettered_at is not None
         ):
-            return False
+            return None
         message.published_at = datetime.now(UTC)
         message.claimed_by = None
         message.lease_until = None
         message.next_attempt_at = None
         message.last_error = None
-        await session.commit()
-        return True
+        outcome = "dead_lettered" if message.dead_lettered_at is not None else "retry"
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
+        return outcome
 
     @staticmethod
     def mark_failed(
@@ -125,7 +129,8 @@ class OutboxRepository:
         error: str,
         max_attempts: int,
         base_backoff_seconds: int,
-    ) -> bool:
+        commit: bool = True,
+    ) -> str | None:
         message = await session.get(OutboxMessage, message_id)
         if (
             message is None
