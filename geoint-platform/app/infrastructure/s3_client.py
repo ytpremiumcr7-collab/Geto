@@ -28,9 +28,7 @@ def ensure_bucket(client: Any, bucket: str, *, allow_create: bool) -> str:
     if client.bucket_exists(bucket):
         return bucket
     if not allow_create:
-        raise RuntimeError(
-            f"S3 bucket {bucket!r} does not exist and S3_CREATE_BUCKET is false"
-        )
+        raise RuntimeError(f"S3 bucket {bucket!r} does not exist and S3_CREATE_BUCKET is false")
     client.make_bucket(bucket)
     return bucket
 
