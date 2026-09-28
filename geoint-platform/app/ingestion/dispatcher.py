@@ -76,14 +76,11 @@ def _fetch_kwargs(
         }
     if source_id == "minio_dropzone":
         tenant_segment = quote(str(tenant_id).strip(), safe="-_.~")
-        tenant_root = (
-            f"{settings.dropzone_prefix_incoming.rstrip('/')}/{tenant_segment}/"
-        )
+        tenant_root = f"{settings.dropzone_prefix_incoming.rstrip('/')}/{tenant_segment}/"
         requested = str(config.get("prefix") or tenant_root)
         if not requested.startswith(tenant_root):
             raise ValueError(
-                "minio_dropzone prefix must remain inside the tenant dropzone "
-                f"{tenant_root!r}"
+                f"minio_dropzone prefix must remain inside the tenant dropzone {tenant_root!r}"
             )
         return {
             "prefix": requested,
