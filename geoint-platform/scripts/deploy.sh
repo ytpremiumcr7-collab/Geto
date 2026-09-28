@@ -149,7 +149,8 @@ cmd_up() {
   seed
 
   # Start API/workers only after schema migration and seed complete.
-  compose up -d geoint-api geoint-web geoint-scheduler geoint-worker geoint-outbox geoint-alert-notifier
+  compose up -d --scale geoint-worker="${GEOINT_WORKER_REPLICAS:-2}" \
+    geoint-api geoint-web geoint-scheduler geoint-worker geoint-outbox geoint-alert-notifier
   wait_ready
   log "Deploy complete"
   compose ps
