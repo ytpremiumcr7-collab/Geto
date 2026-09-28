@@ -21,8 +21,8 @@ trap cleanup EXIT
 : "${POSTGRES_USER:?POSTGRES_USER is required}"
 : "${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}"
 : "${POSTGRES_DB:?POSTGRES_DB is required}"
-: "${MINIO_ROOT_USER:?MINIO_ROOT_USER is required}"
-: "${MINIO_ROOT_PASSWORD:?MINIO_ROOT_PASSWORD is required}"
+: "${S3_ACCESS_KEY:?S3_ACCESS_KEY is required}"
+: "${S3_SECRET_KEY:?S3_SECRET_KEY is required}"
 : "${GEOINT_ENV_FILE:?GEOINT_ENV_FILE is required}"
 
 rm -rf "$BACKUP_DIR"
@@ -31,14 +31,11 @@ echo "[dr-smoke] build production images"
 compose build geoint-api geoint-web
 
 echo "[dr-smoke] start stateful dependencies"
-compose up -d --wait postgres minio redis nats
+compose up -d --wait postgres object-store redis nats
 
-echo "[dr-smoke] provision raw bucket"
-docker compose -f "$COMPOSE_FILE" --profile ops run --rm minio-mc '
-  set -eu
-  mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-  mc mb --ignore-existing local/geoint-raw >/dev/null
-'
+echo "[dr-smoke] verify/provision raw S3 bucket"
+compose run --rm --no-deps geoint-api \
+  python scripts/s3_snapshot.py ensure --bucket geoint-raw
 
 echo "[dr-smoke] migrate database"
 compose run --rm --no-deps geoint-api alembic upgrade head
@@ -91,11 +88,8 @@ INSERT INTO source_jobs (
 COMMIT;
 SQL
 
-printf '%s\n' "$SENTINEL" | docker compose -f "$COMPOSE_FILE" --profile ops run --rm -T minio-mc '
-  set -eu
-  mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-  mc pipe local/geoint-raw/dr/sentinel.txt
-'
+printf '%s\n' "$SENTINEL" | compose run --rm -T --no-deps geoint-api \
+  python scripts/s3_snapshot.py put --bucket geoint-raw --key dr/sentinel.txt
 
 echo "[dr-smoke] take backup using production script"
 BACKUP_ROOT="$(dirname "$BACKUP_DIR")" \
@@ -106,11 +100,8 @@ compose exec -T postgres psql -v ON_ERROR_STOP=1 \
   -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
   -c "UPDATE dr_probe SET value = 'corrupted-after-backup' WHERE id = 1;"
 
-docker compose -f "$COMPOSE_FILE" --profile ops run --rm minio-mc '
-  set -eu
-  mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-  mc rm --force local/geoint-raw/dr/sentinel.txt
-'
+compose run --rm --no-deps geoint-api \
+  python scripts/s3_snapshot.py delete --bucket geoint-raw --key dr/sentinel.txt
 
 compose exec -T redis redis-cli SET dr-stale-key should-disappear >/dev/null
 
@@ -147,16 +138,13 @@ job_status="$(printf '%s\n' "$job_status" | grep -E '^(retry|running|queued|pend
   exit 1
 }
 
-echo "[dr-smoke] verify MinIO sentinel"
+echo "[dr-smoke] verify S3 sentinel"
 object_value="$(
-  docker compose -f "$COMPOSE_FILE" --profile ops run --rm minio-mc '
-    set -eu
-    mc alias set local http://minio:9000 "$MINIO_ROOT_USER" "$MINIO_ROOT_PASSWORD" >/dev/null
-    mc cat local/geoint-raw/dr/sentinel.txt
-  '
+  compose run --rm --no-deps geoint-api \
+    python scripts/s3_snapshot.py get --bucket geoint-raw --key dr/sentinel.txt
 )"
 [[ "$(printf '%s' "$object_value" | tr -d '\r\n')" == "$SENTINEL" ]] || {
-  echo "MinIO sentinel mismatch" >&2
+  echo "S3 sentinel mismatch" >&2
   exit 1
 }
 
