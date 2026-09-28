@@ -1,4 +1,7 @@
-"""Real ingestion E2E: scheduler -> DB outbox -> JetStream -> worker -> dispatcher -> DB/S3 object storage."""
+"""Real ingestion E2E.
+
+scheduler -> DB outbox -> JetStream -> worker -> dispatcher -> DB/S3 object storage.
+"""
 
 from __future__ import annotations
 
