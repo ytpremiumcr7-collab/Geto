@@ -23,12 +23,8 @@ def test_cookie_mutation_requires_allowed_origin_in_production(monkeypatch):
     monkeypatch.setattr(cookie_csrf.settings, "auth_cookie_name", "geoint_access")
     monkeypatch.setattr(cookie_csrf.settings, "cors_origins", "https://app.example.com")
 
-    assert browser_cookie_mutation_allowed(
-        _request(origin="https://app.example.com")
-    )
-    assert not browser_cookie_mutation_allowed(
-        _request(origin="https://evil.example")
-    )
+    assert browser_cookie_mutation_allowed(_request(origin="https://app.example.com"))
+    assert not browser_cookie_mutation_allowed(_request(origin="https://evil.example"))
     assert not browser_cookie_mutation_allowed(_request(origin=None))
 
 
