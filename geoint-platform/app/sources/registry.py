@@ -6,10 +6,10 @@ from app.sources.copernicus.adapter import CopernicusSTACAdapter
 from app.sources.firms.adapter import NASAFIRMSAdapter
 from app.sources.goes.adapter import GOESAdapter
 from app.sources.horizons.adapter import JPLHorizonsAdapter
-from app.sources.s3_dropzone.adapter import S3DropzoneAdapter
 from app.sources.nexrad.adapter import NEXRADAdapter
 from app.sources.opensky.adapter import OpenSkyAdapter
 from app.sources.readsb.adapter import ReadsbLocalAdapter
+from app.sources.s3_dropzone.adapter import S3DropzoneAdapter
 from app.sources.usgs.adapter import USGSEarthquakeAdapter
 
 
