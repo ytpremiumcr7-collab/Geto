@@ -19,8 +19,8 @@ jobs:
       POSTGRES_USER: geoint
       POSTGRES_PASSWORD: ci_dr_postgres_pw
       POSTGRES_DB: geoint
-      MINIO_ROOT_USER: ci_dr_minio_user
-      MINIO_ROOT_PASSWORD: ci_dr_minio_pw
+      S3_ACCESS_KEY: ci_dr_s3_user
+      S3_SECRET_KEY: ci_dr_s3_pw
       GEOINT_ENV_FILE: /tmp/geoint-dr.env
       GEOINT_API_PORT: "8000"
 
@@ -35,11 +35,12 @@ jobs:
           DATABASE_URL=postgresql+asyncpg://geoint:ci_dr_postgres_pw@postgres:5432/geoint
           REDIS_URL=redis://redis:6379/0
           NATS_URL=nats://nats:4222
-          MINIO_ENDPOINT=minio:9000
-          MINIO_ACCESS_KEY=ci_dr_minio_user
-          MINIO_SECRET_KEY=ci_dr_minio_pw
-          MINIO_SECURE=false
-          MINIO_CREATE_BUCKET=false
+          S3_ENDPOINT=object-store:8333
+          S3_ACCESS_KEY=ci_dr_s3_user
+          S3_SECRET_KEY=ci_dr_s3_pw
+          S3_BUCKET_RAW=geoint-raw
+          S3_SECURE=false
+          S3_CREATE_BUCKET=false
           JWT_ALGORITHM=RS256
           JWT_JWKS_URL=https://idp.example.test/.well-known/jwks.json
           JWT_ISSUER=https://idp.example.test/
