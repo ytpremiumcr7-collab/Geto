@@ -6,11 +6,14 @@ import asyncio
 import json
 import os
 import socket
+from uuid import UUID
 
 import structlog
 
 from app.db.tenant import system_worker_session
+from app.jobs.repository import JobRepository
 from app.messaging.jetstream import JetStreamClient
+from app.messaging.subjects import JOBS_PREFIX
 from app.outbox.repository import OutboxRepository
 
 log = structlog.get_logger()
@@ -25,6 +28,7 @@ class OutboxDispatcher:
         self.batch_size = batch_size
         self.interval = interval
         self.repo = OutboxRepository()
+        self.jobs = JobRepository()
         self.js = JetStreamClient()
         self.worker_id = os.getenv("OUTBOX_WORKER_ID") or f"{socket.gethostname()}-{os.getpid()}"
         self._running = False
@@ -96,14 +100,38 @@ class OutboxDispatcher:
                     )
             except Exception as exc:
                 async with system_worker_session() as session:
-                    await self.repo.persist_failure(
+                    outcome = await self.repo.persist_failure(
                         session,
                         message_id=message.id,
                         worker_id=self.worker_id,
                         error=str(exc),
                         max_attempts=settings.outbox_max_attempts,
                         base_backoff_seconds=settings.outbox_base_backoff_seconds,
+                        commit=False,
                     )
+                    if outcome == "dead_lettered" and message.subject.startswith(
+                        f"{JOBS_PREFIX}."
+                    ):
+                        payload = message.payload or {}
+                        job_id_raw = payload.get("job_id")
+                        execution_id_raw = payload.get("execution_id")
+                        if job_id_raw and execution_id_raw:
+                            try:
+                                await self.jobs.mark_failure(
+                                    session,
+                                    UUID(str(job_id_raw)),
+                                    str(exc),
+                                    execution_id=UUID(str(execution_id_raw)),
+                                    commit=False,
+                                )
+                            except (TypeError, ValueError):
+                                log.error(
+                                    "job_dispatch_dead_letter_invalid_identity",
+                                    message_id=str(message.id),
+                                    job_id=str(job_id_raw),
+                                    execution_id=str(execution_id_raw),
+                                )
+                    await session.commit()
                 log.warning(
                     "outbox_publish_failed",
                     message_id=str(message.id),
