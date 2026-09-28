@@ -1,4 +1,5 @@
 from pathlib import Path
+import subprocess
 
 
 def test_backup_restore_and_dr_verification_are_real_scripts():
@@ -31,3 +32,21 @@ def test_backup_restore_and_dr_verification_are_real_scripts():
     assert "clickhouse_bootstrap.py" in restore
     assert "TRUNCATE TABLE IF EXISTS geoint.observations" in rebuild_clickhouse
     assert "system_worker_session" in rebuild_clickhouse
+
+
+def test_operational_shell_scripts_parse():
+    root = Path(__file__).resolve().parents[2]
+    scripts = [
+        root / "scripts" / "backup.sh",
+        root / "scripts" / "restore.sh",
+        root / "scripts" / "verify_backup.sh",
+        root / "scripts" / "deploy.sh",
+    ]
+
+    for script in scripts:
+        subprocess.run(
+            ["bash", "-n", str(script)],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
