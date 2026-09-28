@@ -35,7 +35,7 @@ class JobRepository:
             .where(
                 SourceJob.enabled.is_(True),
                 SourceJob.next_run_at <= now,
-                SourceJob.status.in_(("pending", "retry", "queued", "running")),
+                SourceJob.status.in_(("pending", "retry")),
             )
             .where((SourceJob.locked_until.is_(None)) | (SourceJob.locked_until < now))
             .order_by(SourceJob.next_run_at)
@@ -55,7 +55,8 @@ class JobRepository:
             job.last_run_at = now
             job.attempts += 1
 
-        await session.commit()
+        # Caller owns the transaction so scheduling state and its dispatch
+        # outbox record can commit atomically.
         return jobs
 
     async def mark_success(
