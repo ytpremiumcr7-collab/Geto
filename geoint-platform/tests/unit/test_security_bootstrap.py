@@ -13,6 +13,7 @@ def _settings(**kwargs):
         database_url="postgresql+asyncpg://geoint:StrongP@ssw0rd!@db:5432/geoint",
         minio_access_key="AKIA_STRONG_EXAMPLE_KEY",
         minio_secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        minio_create_bucket=False,
         app_env="production",
         auth_disabled=False,
         jwt_algorithm="RS256",
@@ -224,3 +225,10 @@ def test_production_accepts_authenticated_clickhouse():
         ),
         role="test",
     )
+
+
+def test_production_rejects_runtime_bucket_creation():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="MINIO_CREATE_BUCKET"):
+        validate_settings(_settings(minio_create_bucket=True), role="test")
