@@ -36,7 +36,7 @@ forbid_placeholder() {
   local name="$1"
   local val="${!name:-}"
   case "${val,,}" in
-    ""|change-me*|password|minioadmin*|geoint|secret|admin)
+    ""|change-me*|password|geoint|secret|admin)
       die "$name has a forbidden placeholder/default value"
       ;;
   esac
@@ -61,13 +61,13 @@ env_value() {
 preflight_secrets() {
   require_var POSTGRES_USER
   require_var POSTGRES_PASSWORD
-  require_var MINIO_ROOT_USER
-  require_var MINIO_ROOT_PASSWORD
+  require_var S3_ACCESS_KEY
+  require_var S3_SECRET_KEY
   require_var GEOINT_ENV_FILE
 
   forbid_placeholder POSTGRES_PASSWORD
-  forbid_placeholder MINIO_ROOT_PASSWORD
-  forbid_placeholder MINIO_ROOT_USER
+  forbid_placeholder S3_SECRET_KEY
+  forbid_placeholder S3_ACCESS_KEY
 
   [[ -f "$GEOINT_ENV_FILE" ]] || die "GEOINT_ENV_FILE not found: $GEOINT_ENV_FILE"
   [[ -f "$COMPOSE_FILE" ]] || die "Compose file not found: $COMPOSE_FILE"
@@ -131,7 +131,7 @@ wait_ready() {
 }
 
 pull_dependencies() {
-  local deps=(postgres redis nats minio)
+  local deps=(postgres redis nats object-store)
   if [[ "$ANALYTICS_ENABLED" == "1" ]]; then
     deps+=(clickhouse)
   fi
@@ -141,7 +141,7 @@ pull_dependencies() {
 
 start_dependencies() {
   log "Starting required stateful dependencies"
-  compose up -d --wait postgres redis nats minio
+  compose up -d --wait postgres redis nats object-store
   if [[ "$ANALYTICS_ENABLED" == "1" ]]; then
     compose up -d --wait clickhouse
   fi
