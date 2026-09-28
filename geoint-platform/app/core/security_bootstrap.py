@@ -134,6 +134,12 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
                 "Inject from secret manager."
             )
 
+        if getattr(settings, "minio_create_bucket", True):
+            errors.append(
+                "MINIO_CREATE_BUCKET must be false in production/staging; "
+                "provision object-storage buckets out-of-band before deploy"
+            )
+
         # CORS: must be explicit, never *
         origins = _parse_cors_origins(getattr(settings, "cors_origins", "") or "")
         if not origins:
