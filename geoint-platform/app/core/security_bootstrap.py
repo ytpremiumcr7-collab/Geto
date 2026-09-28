@@ -190,6 +190,17 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
         if env in ("production", "prod") and not th:
             errors.append("TRUSTED_HOSTS is required in production (comma-separated hostnames)")
 
+        if getattr(settings, "clickhouse_enabled", False):
+            ch_user = (getattr(settings, "clickhouse_user", None) or "").strip()
+            ch_password = getattr(settings, "clickhouse_password", None) or ""
+            if not ch_user or not ch_password:
+                errors.append(
+                    "CLICKHOUSE_USER and CLICKHOUSE_PASSWORD are required when "
+                    "CLICKHOUSE_ENABLED=true in production/staging"
+                )
+            elif _is_forbidden(ch_password):
+                errors.append("CLICKHOUSE_PASSWORD uses a forbidden default/placeholder value")
+
         if getattr(settings, "metrics_public", False):
             warnings.append("METRICS_PUBLIC=true exposes /metrics without auth")
     else:
