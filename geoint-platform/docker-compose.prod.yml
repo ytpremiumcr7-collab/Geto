@@ -186,6 +186,7 @@ services:
       MINIO_ENDPOINT: minio:9000
       MINIO_ACCESS_KEY: ${MINIO_ROOT_USER}
       MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+      CLICKHOUSE_URL: http://clickhouse:8123
     depends_on:
       postgres:
         condition: service_healthy
@@ -262,7 +263,11 @@ services:
     expose:
       - "8123"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8123/ping"]
+      test:
+        [
+          "CMD-SHELL",
+          "clickhouse-client --user \"$CLICKHOUSE_USER\" --password \"$CLICKHOUSE_PASSWORD\" --query 'SELECT 1' >/dev/null",
+        ]
       interval: 10s
       timeout: 5s
       retries: 10
