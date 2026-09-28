@@ -46,6 +46,7 @@ async def test_entity_type_filter_skips_non_matching(monkeypatch):
     event = {
         "geofence_id": str(rule.geofence_id),
         "entity_id": "SHIP-1",
+        "source_id": "ais_file",
         "event_type": "geofence.enter",
         "occurred_at": datetime.now(UTC).isoformat(),
         "data": {"entity_type": "vessel", "lat": 1, "lon": 2},

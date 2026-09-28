@@ -250,7 +250,7 @@ Usage: $0 <up|migrate|seed|down|status|remote-up>
 Environment:
   GEOINT_ENV_FILE   path to application env
   POSTGRES_USER / POSTGRES_PASSWORD / POSTGRES_DB
-  MINIO_ROOT_USER / MINIO_ROOT_PASSWORD
+  S3_ACCESS_KEY / S3_SECRET_KEY / S3_BUCKET_RAW
   APP_ENV           production|staging (default production)
   COMPOSE_FILE      default docker-compose.prod.yml
   DEPLOY_HOST / DEPLOY_USER / DEPLOY_PATH / DEPLOY_SSH_KEY

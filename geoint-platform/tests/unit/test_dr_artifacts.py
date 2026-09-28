@@ -1,3 +1,4 @@
+import stat
 import subprocess
 from pathlib import Path
 
@@ -51,6 +52,7 @@ def test_operational_shell_scripts_parse():
             capture_output=True,
             text=True,
         )
+        assert script.stat().st_mode & stat.S_IXUSR
 
 
 def test_dr_workflow_executes_real_backup_restore_scripts():
