@@ -119,19 +119,25 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
             if env == "production" and not jwks.startswith("https://"):
                 errors.append("JWT_JWKS_URL must use https:// in production")
 
-        # Secrets: database, minio
+        # Secrets: database and S3 object storage
         if _looks_like_placeholder_dsn(settings.database_url or ""):
             errors.append(
                 "DATABASE_URL contains a placeholder password (change-me/geoint/password). "
                 "Inject secrets from your secret manager."
             )
 
-        minio_ak = getattr(settings, "minio_access_key", "") or ""
-        minio_sk = getattr(settings, "minio_secret_key", "") or ""
-        if _is_forbidden(minio_ak) or _is_forbidden(minio_sk):
+        s3_ak = getattr(settings, "s3_access_key", "") or ""
+        s3_sk = getattr(settings, "s3_secret_key", "") or ""
+        if _is_forbidden(s3_ak) or _is_forbidden(s3_sk):
             errors.append(
-                "MINIO_ACCESS_KEY / MINIO_SECRET_KEY are missing or use forbidden defaults. "
+                "S3_ACCESS_KEY / S3_SECRET_KEY are missing or use forbidden defaults. "
                 "Inject from secret manager."
+            )
+
+        if getattr(settings, "s3_create_bucket", True):
+            errors.append(
+                "S3_CREATE_BUCKET must be false in production/staging; "
+                "provision object-storage buckets out-of-band before deploy"
             )
 
         # CORS: must be explicit, never *
@@ -150,6 +156,22 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
                     warnings.append(f"CORS origin uses http:// (lab only): {o}")
                 elif not o.startswith("https://"):
                     errors.append(f"CORS origin must be https://… in production: {o}")
+
+        # Browser product auth is a BFF OIDC Authorization Code + PKCE flow.
+        # Production must not fall back to the bootstrap role form or expose the
+        # IdP token to browser storage.
+        oidc_client_id = (getattr(settings, "oidc_client_id", None) or "").strip()
+        oidc_redirect_uri = (getattr(settings, "oidc_redirect_uri", None) or "").strip()
+        if not oidc_client_id:
+            errors.append("OIDC_CLIENT_ID is required in production/staging for browser login")
+        if not oidc_redirect_uri:
+            errors.append("OIDC_REDIRECT_URI is required in production/staging for browser login")
+        elif not oidc_redirect_uri.startswith("https://"):
+            errors.append("OIDC_REDIRECT_URI must use https:// in production/staging")
+        if not getattr(settings, "auth_cookie_mode", False):
+            errors.append("AUTH_COOKIE_MODE=true is required in production/staging browser login")
+        if not getattr(settings, "auth_cookie_secure", False):
+            errors.append("AUTH_COOKIE_SECURE=true is required in production/staging")
 
         # Bootstrap token issuance should not be open without secret
         bootstrap = getattr(settings, "auth_bootstrap_secret", None) or ""
@@ -173,6 +195,17 @@ def validate_settings(settings: Settings, *, role: str = "api") -> None:
         th = (getattr(settings, "trusted_hosts", None) or "").strip()
         if env in ("production", "prod") and not th:
             errors.append("TRUSTED_HOSTS is required in production (comma-separated hostnames)")
+
+        if getattr(settings, "clickhouse_enabled", False):
+            ch_user = (getattr(settings, "clickhouse_user", None) or "").strip()
+            ch_password = getattr(settings, "clickhouse_password", None) or ""
+            if not ch_user or not ch_password:
+                errors.append(
+                    "CLICKHOUSE_USER and CLICKHOUSE_PASSWORD are required when "
+                    "CLICKHOUSE_ENABLED=true in production/staging"
+                )
+            elif _is_forbidden(ch_password):
+                errors.append("CLICKHOUSE_PASSWORD uses a forbidden default/placeholder value")
 
         if getattr(settings, "metrics_public", False):
             warnings.append("METRICS_PUBLIC=true exposes /metrics without auth")

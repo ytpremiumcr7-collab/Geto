@@ -119,6 +119,7 @@ async def main() -> int:
             "event_type": "geofence.enter",
             "geofence_id": str(fence_id),
             "entity_id": "E2E-ACFT-1",
+            "source_id": "usgs_earthquake",
             "occurred_at": datetime.now(UTC).isoformat(),
             "data": {"lat": 19.4, "lon": -99.1},
         }

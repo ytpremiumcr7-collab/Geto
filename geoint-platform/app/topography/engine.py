@@ -1,7 +1,7 @@
 """Raster processing engine — GDAL + RasterIO + NumPy.
 
 Operations: elevation (point), profile, slope, aspect, hillshade, LOS, viewshed.
-Works on local file paths or paths resolved from MinIO (downloaded to temp).
+Works on local file paths or paths resolved from S3 object storage (downloaded to temp).
 """
 
 from __future__ import annotations

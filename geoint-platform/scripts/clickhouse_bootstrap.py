@@ -10,6 +10,8 @@ from pathlib import Path
 import httpx
 
 URL = os.environ.get("CLICKHOUSE_URL", "http://localhost:8123").rstrip("/")
+USER = (os.environ.get("CLICKHOUSE_USER") or "").strip()
+PASSWORD = os.environ.get("CLICKHOUSE_PASSWORD") or ""
 INIT = Path(__file__).resolve().parents[1] / "deploy" / "clickhouse" / "init.sql"
 
 
@@ -23,7 +25,8 @@ def _statements(sql: str) -> list[str]:
 
 def main() -> int:
     statements = _statements(INIT.read_text())
-    with httpx.Client(timeout=30.0) as client:
+    auth = (USER, PASSWORD) if USER and PASSWORD else None
+    with httpx.Client(timeout=30.0, auth=auth) as client:
         r = client.get(f"{URL}/ping")
         if r.status_code != 200:
             print(f"FAIL ping {r.status_code}", file=sys.stderr)
