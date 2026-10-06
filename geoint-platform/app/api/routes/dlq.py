@@ -70,19 +70,24 @@ async def requeue_dlq(
         source_id = msg.source_id
         # Re-publicar como job si tiene job_id
         if payload.get("job_id"):
+            job_id = UUID(str(payload["job_id"]))
+            execution_id = UUID(str(payload.get("execution_id") or job_id))
             await js.publish_job(
-                job_id=UUID(str(payload["job_id"])),
+                job_id=job_id,
+                execution_id=execution_id,
                 source_id=source_id,
                 job_type=payload.get("job_type", "poll"),
                 config=payload.get("config") or {},
+                tenant_id=msg.tenant_id,
             )
         else:
             assert js.js is not None
             import json
 
+            replay_payload = {**payload, "tenant_id": msg.tenant_id}
             await js.js.publish(
                 f"{JOBS_PREFIX}.{source_id}",
-                json.dumps(payload, default=str).encode(),
+                json.dumps(replay_payload, default=str).encode(),
             )
     finally:
         await js.close()

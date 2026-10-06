@@ -87,8 +87,8 @@ SOURCE_POLICIES: dict[str, SourceAccessPolicy] = {
         read_permission="geoint.source.copernicus.read",
         admin_permission="geoint.source.copernicus.admin",
     ),
-    "minio_dropzone": SourceAccessPolicy(
-        source_id="minio_dropzone",
+    "s3_dropzone": SourceAccessPolicy(
+        source_id="s3_dropzone",
         access_policy=AccessPolicy.INTERNAL,
         commercial_status="allowed",
         retention="standard",
@@ -149,6 +149,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "geoint.source.firms.read",
             "geoint.source.aviation_weather.read",
             "geoint.source.copernicus.read",
+            "geoint.source.nexrad.read",
+            "geoint.source.goes.read",
         }
     ),
     "operator": frozenset(
@@ -162,6 +164,8 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "geoint.source.readsb.read",
             "geoint.source.ais.read",
             "geoint.source.horizons.read",
+            "geoint.source.nexrad.read",
+            "geoint.source.goes.read",
         }
     ),
     "admin": frozenset(
@@ -186,6 +190,10 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
             "geoint.source.ais.admin",
             "geoint.source.horizons.read",
             "geoint.source.horizons.admin",
+            "geoint.source.nexrad.read",
+            "geoint.source.nexrad.admin",
+            "geoint.source.goes.read",
+            "geoint.source.goes.admin",
             "geoint.admin.jobs",
             "geoint.admin.dlq",
             "geoint.admin.tenants",
@@ -222,6 +230,18 @@ def can_read_source(principal: Principal, source_id: str) -> bool:
     if policy.access_policy == AccessPolicy.OPEN and principal.roles - {"public", "demo"}:
         return True
     return False
+
+
+def readable_source_ids(principal: Principal) -> frozenset[str]:
+    """Return the exact source universe this principal may read.
+
+    Unknown/unregistered sources are intentionally excluded. Callers should pass
+    this set into data queries even when the client did not request a source so
+    "all sources" can never become an authorization bypass.
+    """
+    return frozenset(
+        source_id for source_id in SOURCE_POLICIES if can_read_source(principal, source_id)
+    )
 
 
 def can_admin_source(principal: Principal, source_id: str) -> bool:

@@ -52,6 +52,7 @@ class GeofenceAlert(Base):
     rule_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True))
     geofence_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), nullable=False)
     entity_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     event_type: Mapped[str] = mapped_column(String(32), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), default="medium", nullable=False)
     status: Mapped[str] = mapped_column(String(16), default="open", nullable=False)

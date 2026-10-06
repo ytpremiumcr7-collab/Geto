@@ -16,6 +16,14 @@ from app.core.config import settings
 from app.messaging.subjects import DLQ_PREFIX, JOBS_PREFIX
 
 
+def outbox_duplicate_window_seconds() -> float:
+    retries = max(0, int(settings.outbox_max_attempts) - 1)
+    base = max(1, int(settings.outbox_base_backoff_seconds))
+    retry_horizon = sum(min(3600, base * (2**attempt)) for attempt in range(retries))
+    lease = max(30, int(settings.outbox_lease_seconds))
+    return float(max(300, retry_horizon + (2 * lease)))
+
+
 class JetStreamClient:
     def __init__(self, url: str | None = None):
         self.url = url or settings.nats_url
@@ -37,10 +45,13 @@ class JetStreamClient:
                     f"{JOBS_PREFIX}.>",
                     "geoint.observation.>",
                     "geoint.event.>",
+                    "geoint.alert.>",
+                    "geoint.ingestion.>",
                 ],
                 retention=RetentionPolicy.LIMITS,
                 storage=StorageType.FILE,
                 max_age=settings.nats_max_age_seconds,
+                duplicate_window=outbox_duplicate_window_seconds(),
             ),
             StreamConfig(
                 name=f"{settings.nats_stream}_DLQ",
@@ -60,6 +71,7 @@ class JetStreamClient:
         self,
         *,
         job_id: UUID,
+        execution_id: UUID,
         source_id: str,
         job_type: str,
         config: dict[str, Any],
@@ -68,6 +80,7 @@ class JetStreamClient:
         assert self.js is not None
         payload = {
             "job_id": str(job_id),
+            "execution_id": str(execution_id),
             "source_id": source_id,
             "job_type": job_type,
             "config": config or {},
@@ -77,7 +90,7 @@ class JetStreamClient:
         await self.js.publish(
             subject,
             json.dumps(payload, default=str).encode(),
-            headers={"Nats-Msg-Id": str(job_id)},
+            headers={"Nats-Msg-Id": str(execution_id)},
         )
 
     async def publish_dlq(

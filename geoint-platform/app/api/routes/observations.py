@@ -7,7 +7,7 @@ from app.auth.dependencies import get_current_principal, get_tenant_db
 from app.auth.models import Principal
 from app.db.repositories import ObservationRepository
 from app.db.session import get_db  # noqa: F401 — legacy
-from app.policies.source_access import assert_can_read_source
+from app.policies.source_access import assert_can_read_source, can_read_source, readable_source_ids
 
 router = APIRouter(
     prefix="/api/v1/observations",
@@ -25,16 +25,24 @@ async def list_observations(
     db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
+    allowed_sources = readable_source_ids(principal)
     if source_id:
         assert_can_read_source(principal, source_id)
+        query_sources = frozenset({source_id})
+    else:
+        query_sources = allowed_sources
     repository = ObservationRepository(db)
     rows = await repository.list(
         entity_id=entity_id,
         source_id=source_id,
+        source_ids=query_sources,
         since=since,
         until=until,
         limit=limit,
     )
+    # Defense in depth: never serialize a source outside the principal scope,
+    # even if a future repository regression returns a wider row set.
+    rows = [row for row in rows if can_read_source(principal, row.source_id)]
     from geoalchemy2.shape import to_shape
 
     observations = []

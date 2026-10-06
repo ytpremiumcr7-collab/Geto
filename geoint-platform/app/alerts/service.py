@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import uuid
+from collections.abc import Collection
 from datetime import UTC, datetime
 from typing import Any
 
@@ -42,6 +43,7 @@ def _alert_dict(a: GeofenceAlert) -> dict[str, Any]:
         "rule_id": str(a.rule_id) if a.rule_id else None,
         "geofence_id": str(a.geofence_id),
         "entity_id": a.entity_id,
+        "source_id": a.source_id,
         "event_type": a.event_type,
         "severity": a.severity,
         "status": a.status,
@@ -140,19 +142,56 @@ class AlertService:
         *,
         status: str | None = "open",
         limit: int = 50,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> list[dict[str, Any]]:
         stmt = select(GeofenceAlert).where(GeofenceAlert.tenant_id == tenant_id)
+        if allowed_source_ids is not None:
+            allowed = tuple(dict.fromkeys(str(item) for item in allowed_source_ids if str(item)))
+            if not allowed:
+                return []
+            stmt = stmt.where(GeofenceAlert.source_id.in_(allowed))
         if status:
             stmt = stmt.where(GeofenceAlert.status == status)
         stmt = stmt.order_by(GeofenceAlert.occurred_at.desc()).limit(limit)
         result = await session.execute(stmt)
         return [_alert_dict(a) for a in result.scalars().all()]
 
+    async def get_alert(
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        alert_id: uuid.UUID,
+        *,
+        allowed_source_ids: Collection[str] | None = None,
+    ) -> GeofenceAlert | None:
+        stmt = select(GeofenceAlert).where(
+            GeofenceAlert.id == alert_id,
+            GeofenceAlert.tenant_id == tenant_id,
+        )
+        if allowed_source_ids is not None:
+            allowed = tuple(dict.fromkeys(str(item) for item in allowed_source_ids if str(item)))
+            if not allowed:
+                return None
+            stmt = stmt.where(GeofenceAlert.source_id.in_(allowed))
+        result = await session.execute(stmt)
+        return result.scalar_one_or_none()
+
     async def ack_alert(
-        self, session: AsyncSession, tenant_id: str, alert_id: uuid.UUID, user_id: str
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        alert_id: uuid.UUID,
+        user_id: str,
+        *,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> dict[str, Any] | None:
-        a = await session.get(GeofenceAlert, alert_id)
-        if not a or a.tenant_id != tenant_id:
+        a = await self.get_alert(
+            session,
+            tenant_id,
+            alert_id,
+            allowed_source_ids=allowed_source_ids,
+        )
+        if a is None:
             return None
         a.status = "acked"
         a.acked_at = datetime.now(UTC)
@@ -162,10 +201,20 @@ class AlertService:
         return _alert_dict(a)
 
     async def resolve_alert(
-        self, session: AsyncSession, tenant_id: str, alert_id: uuid.UUID
+        self,
+        session: AsyncSession,
+        tenant_id: str,
+        alert_id: uuid.UUID,
+        *,
+        allowed_source_ids: Collection[str] | None = None,
     ) -> dict[str, Any] | None:
-        a = await session.get(GeofenceAlert, alert_id)
-        if not a or a.tenant_id != tenant_id:
+        a = await self.get_alert(
+            session,
+            tenant_id,
+            alert_id,
+            allowed_source_ids=allowed_source_ids,
+        )
+        if a is None:
             return None
         a.status = "resolved"
         a.resolved_at = datetime.now(UTC)
@@ -182,6 +231,9 @@ class AlertService:
     ) -> list[dict[str, Any]]:
         """Create GeofenceAlert rows for matching rules (enter/exit product path)."""
         geofence_id = uuid.UUID(str(event["geofence_id"]))
+        source_id = str(event.get("source_id") or "").strip()
+        if not source_id:
+            raise ValueError("geofence alert event is missing source_id provenance")
         event_type = "enter" if event.get("event_type") == "geofence.enter" else "exit"
         occurred_at = datetime.fromisoformat(event["occurred_at"].replace("Z", "+00:00"))
         if occurred_at.tzinfo is None:
@@ -217,6 +269,7 @@ class AlertService:
                 rule_id=rule.id,
                 geofence_id=geofence_id,
                 entity_id=event["entity_id"],
+                source_id=source_id,
                 event_type=event_type,
                 severity=rule.severity,
                 status="open",
