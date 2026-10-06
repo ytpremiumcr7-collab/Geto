@@ -1,8 +1,9 @@
+from collections.abc import Collection
 from datetime import datetime
 
 from geoalchemy2.shape import from_shape
 from shapely.geometry import Point
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Entity, Observation
@@ -74,6 +75,7 @@ class ObservationRepository:
         self,
         entity_id: str | None = None,
         source_id: str | None = None,
+        source_ids: Collection[str] | None = None,
         since: datetime | None = None,
         until: datetime | None = None,
         limit: int = 100,
@@ -86,6 +88,12 @@ class ObservationRepository:
         if source_id:
             stmt = stmt.where(Observation.source_id == source_id)
 
+        if source_ids is not None:
+            allowed = tuple(dict.fromkeys(str(item) for item in source_ids if str(item)))
+            if not allowed:
+                return []
+            stmt = stmt.where(Observation.source_id.in_(allowed))
+
         if since is not None:
             stmt = stmt.where(Observation.observed_at >= since)
 
@@ -97,6 +105,46 @@ class ObservationRepository:
         result = await self.session.execute(stmt)
 
         return list(result.scalars().all())
+
+    async def visible_entity_summary(
+        self,
+        *,
+        entity_id: str,
+        source_ids: Collection[str],
+    ) -> dict | None:
+        """Summarize an entity strictly from observations the caller may read."""
+        allowed = tuple(dict.fromkeys(str(item) for item in source_ids if str(item)))
+        if not allowed:
+            return None
+
+        conditions = (
+            Observation.entity_id == entity_id,
+            Observation.source_id.in_(allowed),
+        )
+        stats = await self.session.execute(
+            select(
+                func.min(Observation.observed_at),
+                func.max(Observation.observed_at),
+            ).where(*conditions)
+        )
+        first_seen, last_seen = stats.one()
+        if first_seen is None or last_seen is None:
+            return None
+
+        latest_result = await self.session.execute(
+            select(Observation).where(*conditions).order_by(Observation.observed_at.desc()).limit(1)
+        )
+        latest = latest_result.scalar_one_or_none()
+        if latest is None:
+            return None
+        return {
+            "entity_id": latest.entity_id,
+            "entity_type": latest.entity_type,
+            "first_seen": first_seen,
+            "last_seen": last_seen,
+            "properties": latest.attributes or {},
+            "source_id": latest.source_id,
+        }
 
 
 class EntityRepository:

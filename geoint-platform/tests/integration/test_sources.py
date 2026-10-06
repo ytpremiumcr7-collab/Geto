@@ -29,7 +29,7 @@ async def test_sources_endpoint():
     assert "nasa_firms" in ids
     assert "aviation_weather" in ids
     assert "copernicus" in ids
-    assert "minio_dropzone" in ids
+    assert "s3_dropzone" in ids
     assert "readsb_local" in ids
     assert "ais_file" in ids
     assert "jpl_horizons" in ids

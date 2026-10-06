@@ -27,6 +27,7 @@ from app.core.config import settings
 from app.core.logging import configure_logging
 from app.core.security_bootstrap import cors_origin_list, validate_settings
 from app.core.telemetry import setup_opentelemetry
+from app.middleware.cookie_csrf import CookieCsrfMiddleware
 from app.middleware.rate_limit_mw import RateLimitMiddleware
 
 configure_logging(settings.log_level)
@@ -43,22 +44,24 @@ async def lifespan(app: FastAPI):
     bridge = None
     task = None
     if settings.app_env not in ("test",):
-        try:
-            from app.realtime.nats_bridge import RealtimeNatsBridge
+        from app.realtime.nats_bridge import RealtimeNatsBridge
 
-            bridge = RealtimeNatsBridge()
-            task = asyncio.create_task(bridge.start())
-        except Exception:
-            bridge = None
-    yield
-    if bridge:
-        bridge.stop()
-        if task:
-            task.cancel()
-            try:
-                await task
-            except Exception:
-                pass
+        bridge = RealtimeNatsBridge()
+        # NATS/realtime is a required product dependency. Do not report a
+        # successful API startup while its subscriptions are dead in a task.
+        await bridge.connect()
+        task = asyncio.create_task(bridge.serve())
+    try:
+        yield
+    finally:
+        if bridge:
+            bridge.stop()
+            if task:
+                task.cancel()
+                try:
+                    await task
+                except asyncio.CancelledError:
+                    pass
             await bridge.close()
 
 
@@ -74,6 +77,7 @@ if _trusted:
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=_trusted)
 
 app.add_middleware(RateLimitMiddleware)
+app.add_middleware(CookieCsrfMiddleware)
 
 # CORS: explicit origins in prod (validated by security_bootstrap); * only in dev
 _origins = cors_origin_list(settings)

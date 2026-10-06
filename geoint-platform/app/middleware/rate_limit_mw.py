@@ -59,6 +59,11 @@ def _identity_suffix(request: Request) -> str:
     api_key = request.headers.get("x-api-key") or ""
     if api_key:
         return hashlib.sha256(api_key.encode()).hexdigest()[:16]
+    if getattr(settings, "auth_cookie_mode", False):
+        cookie_name = getattr(settings, "auth_cookie_name", "geoint_access") or "geoint_access"
+        cookie = request.cookies.get(cookie_name) or ""
+        if cookie:
+            return hashlib.sha256(cookie.encode()).hexdigest()[:16]
     return "anon"
 
 

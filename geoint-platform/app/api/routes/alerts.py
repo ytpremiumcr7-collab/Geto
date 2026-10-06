@@ -14,6 +14,7 @@ from app.auth.dependencies import get_current_principal, get_tenant_db, require_
 from app.auth.models import Principal
 from app.db.session import get_db  # noqa: F401 — legacy
 from app.geofencing.models import Geofence
+from app.policies.source_access import readable_source_ids
 
 router = APIRouter(prefix="/api/v1/alerts", tags=["alerts"])
 svc = AlertService()
@@ -135,7 +136,13 @@ async def list_alerts(
     principal: Principal = Depends(get_current_principal),
 ):
     return {
-        "alerts": await svc.list_alerts(db, principal.tenant_id, status=status, limit=limit),
+        "alerts": await svc.list_alerts(
+            db,
+            principal.tenant_id,
+            status=status,
+            limit=limit,
+            allowed_source_ids=readable_source_ids(principal),
+        ),
         "tenant_id": principal.tenant_id,
     }
 
@@ -146,7 +153,13 @@ async def ack_alert(
     db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
-    item = await svc.ack_alert(db, principal.tenant_id, alert_id, principal.user_id)
+    item = await svc.ack_alert(
+        db,
+        principal.tenant_id,
+        alert_id,
+        principal.user_id,
+        allowed_source_ids=readable_source_ids(principal),
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Alert not found")
     return item
@@ -158,7 +171,12 @@ async def resolve_alert(
     db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(require_roles("admin", "operator")),
 ):
-    item = await svc.resolve_alert(db, principal.tenant_id, alert_id)
+    item = await svc.resolve_alert(
+        db,
+        principal.tenant_id,
+        alert_id,
+        allowed_source_ids=readable_source_ids(principal),
+    )
     if not item:
         raise HTTPException(status_code=404, detail="Alert not found")
     return item
@@ -170,5 +188,13 @@ async def list_deliveries(
     db: AsyncSession = Depends(get_tenant_db),
     principal: Principal = Depends(get_current_principal),
 ):
+    visible_alert = await svc.get_alert(
+        db,
+        principal.tenant_id,
+        alert_id,
+        allowed_source_ids=readable_source_ids(principal),
+    )
+    if visible_alert is None:
+        raise HTTPException(status_code=404, detail="Alert not found")
     items = await DeliveryService().list_for_alert(db, principal.tenant_id, alert_id)
     return {"deliveries": items, "alert_id": str(alert_id)}

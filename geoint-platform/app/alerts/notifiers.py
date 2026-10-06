@@ -34,16 +34,21 @@ class Notifier(Protocol):
 
 
 def build_alert_body(alert: dict[str, Any]) -> dict[str, Any]:
+    payload = alert.get("payload") or {}
+    source_id = alert.get("source_id")
+    if not source_id and isinstance(payload, dict):
+        source_id = payload.get("source_id")
     return {
         "id": alert.get("id"),
         "tenant_id": alert.get("tenant_id"),
         "geofence_id": alert.get("geofence_id"),
         "entity_id": alert.get("entity_id"),
+        "source_id": source_id,
         "event_type": alert.get("event_type"),
         "severity": alert.get("severity"),
         "status": alert.get("status"),
         "occurred_at": alert.get("occurred_at"),
-        "payload": alert.get("payload") or {},
+        "payload": payload,
         "product": "geoint",
         "version": "2.3.0",
     }

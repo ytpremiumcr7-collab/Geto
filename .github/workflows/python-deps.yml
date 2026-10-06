@@ -54,8 +54,8 @@ jobs:
         env:
           APP_ENV: test
           DATABASE_URL: postgresql+asyncpg://ci:ci@localhost:5432/ci
-          MINIO_ACCESS_KEY: ci-access
-          MINIO_SECRET_KEY: ci-secret-not-for-runtime
+          S3_ACCESS_KEY: ci-access
+          S3_SECRET_KEY: ci-secret-not-for-runtime
         run: |
           python -c "import app; from app.main import app as fastapi_app; print('ok', fastapi_app.title)"
           ruff --version

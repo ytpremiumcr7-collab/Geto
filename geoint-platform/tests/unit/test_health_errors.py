@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 
@@ -37,20 +39,22 @@ async def test_readiness_structure_on_total_failure(monkeypatch):
 
     class BoomStore:
         def ensure_bucket(self):
-            raise RuntimeError("minio down")
+            raise RuntimeError("s3 down")
 
     monkeypatch.setattr(health_mod, "ObjectStore", BoomStore)
 
-    body = await health_mod.readiness()
+    response = await health_mod.readiness()
+    assert response.status_code == 503
+    body = json.loads(response.body)
     assert body["status"] == "degraded"
     assert body["postgres"] is False
     assert body["nats"] is False
-    assert body["minio"] is False
+    assert body["s3"] is False
     assert isinstance(body["errors"], list)
     assert len(body["errors"]) >= 3
     comps = {e["component"] for e in body["errors"]}
     assert "postgres" in comps
     assert "nats" in comps
-    assert "minio" in comps
+    assert "s3" in comps
     for e in body["errors"]:
         assert "error_type" in e and "message" in e

@@ -1,0 +1,70 @@
+name: Disaster recovery drill
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backup-restore:
+    name: Backup restore drill
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      APP_ENV: production
+      POSTGRES_USER: geoint
+      POSTGRES_PASSWORD: ci_dr_postgres_pw
+      POSTGRES_DB: geoint
+      S3_ACCESS_KEY: ci_dr_s3_user
+      S3_SECRET_KEY: ci_dr_s3_pw
+      GEOINT_ENV_FILE: /tmp/geoint-dr.env
+      GEOINT_API_PORT: "8000"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare application environment
+        run: |
+          cat > "$GEOINT_ENV_FILE" <<'EOF'
+          APP_ENV=production
+          AUTH_DISABLED=false
+          DATABASE_URL=postgresql+asyncpg://geoint:ci_dr_postgres_pw@postgres:5432/geoint
+          REDIS_URL=redis://redis:6379/0
+          NATS_URL=nats://nats:4222
+          S3_ENDPOINT=object-store:8333
+          S3_ACCESS_KEY=ci_dr_s3_user
+          S3_SECRET_KEY=ci_dr_s3_pw
+          S3_BUCKET_RAW=geoint-raw
+          S3_SECURE=false
+          S3_CREATE_BUCKET=false
+          JWT_ALGORITHM=RS256
+          JWT_JWKS_URL=https://idp.example.test/.well-known/jwks.json
+          JWT_ISSUER=https://idp.example.test/
+          JWT_AUDIENCE=geoint-api
+          OIDC_CLIENT_ID=geto-dr-ci
+          OIDC_REDIRECT_URI=https://app.example.test/api/v1/auth/oidc/callback
+          AUTH_COOKIE_MODE=true
+          AUTH_COOKIE_SECURE=true
+          AUTH_COOKIE_SAMESITE=lax
+          CORS_ORIGINS=https://app.example.test
+          TRUSTED_HOSTS=127.0.0.1,localhost,app.example.test
+          RATE_LIMIT_FAIL_OPEN=false
+          PROMETHEUS_ENABLED=false
+          CLICKHOUSE_ENABLED=false
+          EOF
+
+      - name: Parse operational shell scripts
+        working-directory: geoint-platform
+        run: |
+          bash -n scripts/backup.sh
+          bash -n scripts/restore.sh
+          bash -n scripts/deploy.sh
+          bash -n scripts/dr_restore_smoke.sh
+
+      - name: Run backup restore drill
+        working-directory: geoint-platform
+        run: bash scripts/dr_restore_smoke.sh

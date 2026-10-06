@@ -47,6 +47,7 @@ class SourceJob(Base):
     next_run_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     locked_by: Mapped[str | None] = mapped_column(String(128))
+    execution_id: Mapped[uuid.UUID | None] = mapped_column(UUID(as_uuid=True), index=True)
     attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     max_attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=5)
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))

@@ -5,6 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import UTC, datetime
 from typing import Any
+from urllib.parse import quote
 
 import structlog
 from geoalchemy2.shape import from_shape
@@ -20,6 +21,7 @@ from app.db.repositories import EntityRepository
 from app.db.tenant import set_tenant
 from app.domain.models import Observation
 from app.domain.quality import calculate_quality
+from app.events.repository import EventRepository
 from app.geofencing.service import GeofenceService
 from app.infrastructure.object_store import ObjectStore
 from app.infrastructure.retry import retryable
@@ -32,7 +34,12 @@ log = structlog.get_logger()
 
 
 # Argumentos de fetch por fuente (sin kwargs ciegos).
-def _fetch_kwargs(source_id: str, config: dict[str, Any]) -> dict[str, Any]:
+def _fetch_kwargs(
+    source_id: str,
+    config: dict[str, Any],
+    *,
+    tenant_id: str = "default",
+) -> dict[str, Any]:
     if source_id == "opensky":
         return {
             "lamin": config.get("lamin", settings.default_aoi_south),
@@ -67,9 +74,16 @@ def _fetch_kwargs(source_id: str, config: dict[str, Any]) -> dict[str, Any]:
             "stop": config.get("stop"),
             "step": config.get("step", "1 d"),
         }
-    if source_id == "minio_dropzone":
+    if source_id == "s3_dropzone":
+        tenant_segment = quote(str(tenant_id).strip(), safe="-_.~")
+        tenant_root = f"{settings.dropzone_prefix_incoming.rstrip('/')}/{tenant_segment}/"
+        requested = str(config.get("prefix") or tenant_root)
+        if not requested.startswith(tenant_root):
+            raise ValueError(
+                f"s3_dropzone prefix must remain inside the tenant dropzone {tenant_root!r}"
+            )
         return {
-            "prefix": config.get("prefix"),
+            "prefix": requested,
             "max_objects": int(config.get("max_objects", 50)),
         }
     # usgs_earthquake, nasa_firms: sin kwargs
@@ -101,7 +115,7 @@ class SourceDispatcher:
         breaker = get_breaker(source_id)
         breaker.before_call()
 
-        kwargs = _fetch_kwargs(source_id, config)
+        kwargs = _fetch_kwargs(source_id, config, tenant_id=tenant_id)
         try:
 
             @retryable()
@@ -143,6 +157,7 @@ class SourceDispatcher:
         ch_rows: list[dict] = []
         geofence_service = GeofenceService()
         outbox_early = OutboxRepository()
+        event_repo = EventRepository(session)
 
         async for obs in adapter.normalize(raw, received_at):
             seen += 1
@@ -182,19 +197,31 @@ class SourceDispatcher:
                         lat=obs.position.lat,
                         altitude=obs.position.altitude_m,
                         observed_at=obs.observed_at,
+                        entity_type=obs.entity_type,
+                        source_id=obs.source_id,
                     )
                 for ev in correlator.detect(obs):
+                    event_payload = {
+                        "event_type": ev.event_type,
+                        "entity_id": ev.entity_id,
+                        "source_id": obs.source_id,
+                        "severity": ev.severity,
+                        "observed_at": ev.observed_at.isoformat(),
+                        "data": ev.payload,
+                        "tenant_id": tenant_id,
+                    }
+                    await event_repo.append(
+                        tenant_id=tenant_id,
+                        source_id=obs.source_id,
+                        event_type=ev.event_type,
+                        entity_id=ev.entity_id,
+                        occurred_at=ev.observed_at,
+                        payload=event_payload,
+                    )
                     await outbox_early.enqueue(
                         session,
                         subject=f"geoint.event.{tenant_id}",
-                        payload={
-                            "event_type": ev.event_type,
-                            "entity_id": ev.entity_id,
-                            "severity": ev.severity,
-                            "observed_at": ev.observed_at.isoformat(),
-                            "data": ev.payload,
-                            "tenant_id": tenant_id,
-                        },
+                        payload=event_payload,
                         tenant_id=tenant_id,
                     )
 
@@ -222,6 +249,11 @@ class SourceDispatcher:
                 tenant_id=tenant_id,
             )
         await session.commit()
+        # Source lifecycle acknowledgements (e.g. moving S3 dropzone
+        # objects) happen only after the authoritative Postgres transaction is
+        # durable. A failure here leaves the execution uncompleted so the worker
+        # can retry the acknowledgement without losing source input.
+        await adapter.after_commit(raw)
         log.info(
             "dispatch_ok",
             source=source_id,

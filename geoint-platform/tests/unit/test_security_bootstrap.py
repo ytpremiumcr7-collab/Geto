@@ -11,8 +11,9 @@ def _settings(**kwargs):
     """Lightweight stand-in for Settings (no pydantic required for unit test)."""
     base = dict(
         database_url="postgresql+asyncpg://geoint:StrongP@ssw0rd!@db:5432/geoint",
-        minio_access_key="AKIA_STRONG_EXAMPLE_KEY",
-        minio_secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        s3_access_key="AKIA_STRONG_EXAMPLE_KEY",
+        s3_secret_key="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+        s3_create_bucket=False,
         app_env="production",
         auth_disabled=False,
         jwt_algorithm="RS256",
@@ -26,6 +27,14 @@ def _settings(**kwargs):
         auth_bootstrap_secret=None,
         trusted_hosts="api.example.com",
         api_keys="",
+        auth_cookie_mode=True,
+        auth_cookie_secure=True,
+        oidc_client_id="geto-web",
+        oidc_redirect_uri="https://app.example.com/api/v1/auth/oidc/callback",
+        clickhouse_enabled=False,
+        clickhouse_url="http://clickhouse:8123",
+        clickhouse_user=None,
+        clickhouse_password=None,
     )
     base.update(kwargs)
     return SimpleNamespace(**base)
@@ -35,6 +44,27 @@ def test_production_ok_with_oidc():
     from app.core.security_bootstrap import validate_settings
 
     validate_settings(_settings(), role="test")
+
+
+def test_production_rejects_missing_browser_oidc_client():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="OIDC_CLIENT_ID"):
+        validate_settings(_settings(oidc_client_id=None), role="test")
+
+
+def test_production_rejects_browser_auth_without_http_only_cookie_mode():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="AUTH_COOKIE_MODE"):
+        validate_settings(_settings(auth_cookie_mode=False), role="test")
+
+
+def test_production_rejects_insecure_auth_cookie():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="AUTH_COOKIE_SECURE"):
+        validate_settings(_settings(auth_cookie_secure=False), role="test")
 
 
 def test_production_rejects_missing_jwks():
@@ -71,12 +101,12 @@ def test_production_rejects_change_me_database():
         )
 
 
-def test_production_rejects_minio_defaults():
+def test_production_rejects_s3_defaults():
     from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
 
-    with pytest.raises(SecurityBootstrapError, match="MINIO_"):
+    with pytest.raises(SecurityBootstrapError, match="S3_"):
         validate_settings(
-            _settings(minio_access_key="change-me", minio_secret_key="change-me"),
+            _settings(s3_access_key="change-me", s3_secret_key="change-me"),
             role="test",
         )
 
@@ -168,3 +198,37 @@ def test_development_does_not_apply_production_plaintext_api_key_gate():
         ),
         role="test",
     )
+
+
+def test_production_rejects_clickhouse_without_credentials():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="CLICKHOUSE"):
+        validate_settings(
+            _settings(
+                clickhouse_enabled=True,
+                clickhouse_user="geoint",
+                clickhouse_password="",
+            ),
+            role="test",
+        )
+
+
+def test_production_accepts_authenticated_clickhouse():
+    from app.core.security_bootstrap import validate_settings
+
+    validate_settings(
+        _settings(
+            clickhouse_enabled=True,
+            clickhouse_user="geoint",
+            clickhouse_password="a-real-clickhouse-password",
+        ),
+        role="test",
+    )
+
+
+def test_production_rejects_runtime_bucket_creation():
+    from app.core.security_bootstrap import SecurityBootstrapError, validate_settings
+
+    with pytest.raises(SecurityBootstrapError, match="S3_CREATE_BUCKET"):
+        validate_settings(_settings(s3_create_bucket=True), role="test")

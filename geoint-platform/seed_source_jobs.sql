@@ -17,7 +17,7 @@ VALUES
    '{"station_ids": "KMCI"}'::jsonb, true),
   (gen_random_uuid(), 'default', 'copernicus-s2', 'copernicus', 'poll', 'pending', 3600, NOW(),
    '{"limit": 20}'::jsonb, true),
-  (gen_random_uuid(), 'default', 'minio-dropzone', 'minio_dropzone', 'poll', 'pending', 60, NOW(),
+  (gen_random_uuid(), 'default', 's3-dropzone', 's3_dropzone', 'poll', 'pending', 60, NOW(),
    '{"max_objects": 50}'::jsonb, true),
   (gen_random_uuid(), 'default', 'nexrad-ktlx', 'nexrad', 'poll', 'pending', 300, NOW(),
    '{"site": "KTLX", "max_keys": 10}'::jsonb, true),
